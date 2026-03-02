@@ -1,0 +1,109 @@
+challenge:
+  duration-days: 7
+
+excluded-worlds:
+  - "world_minapvp"
+
+notifications:
+  outrank:
+    global-cooldown-ms: 15000
+    global-server-cooldown-ms: 8000
+    private-cooldown-ms: 30000
+    summary-threshold: 3
+    max-private-victims-per-event: 2
+    global-top-cutoff: 3
+
+schedule:
+  enabled: true
+  start-on-bootstrap-if-inside-window: false
+  timezone: "America/Santiago"
+  challenge: "MINING"
+  start:
+    day: "MONDAY"
+    hour: 18
+    minute: 0
+  end:
+    day: "SUNDAY"
+    hour: 22
+    minute: 0
+  check-interval-ticks: 600
+
+fancy-npcs:
+  skin-refresh:
+    enabled: false
+    initial-delay-seconds: 20
+    interval-seconds: 900
+    invalid-username-retry-seconds: 1800
+    force-fallback-when-offline-mode: false
+    invalid-username-fallback-skins:
+      - "Steve"
+      - "Alex"
+    mode: "RESPAWN" # UPDATE | RESPAWN
+    debug-logs: false
+    top-npcs:
+      top1: "npc_top_1"
+      top2: "npc_top_2"
+      top3: "npc_top_3"
+    fallback-skins:
+      global: "Steve"
+      top1: ""
+      top2: ""
+      top3: ""
+
+competition-types:
+  mining:
+    materials:
+      - COAL_ORE
+      - DEEPSLATE_COAL_ORE
+      - IRON_ORE
+      - DEEPSLATE_IRON_ORE
+      - GOLD_ORE
+      - DEEPSLATE_GOLD_ORE
+      - DIAMOND_ORE
+      - DEEPSLATE_DIAMOND_ORE
+  woodcutting:
+    materials:
+      - OAK_LOG
+      - SPRUCE_LOG
+      - BIRCH_LOG
+      - JUNGLE_LOG
+      - ACACIA_LOG
+      - DARK_OAK_LOG
+      - MANGROVE_LOG
+      - CHERRY_LOG
+      - CRIMSON_STEM
+      - WARPED_STEM
+  fishing:
+    materials:
+      - COD
+      - SALMON
+      - PUFFERFISH
+      - TROPICAL_FISH
+  slayer:
+    mobs:
+      - ZOMBIE
+      - SKELETON
+      - CREEPER
+      - SPIDER
+      - ENDERMAN
+      - WITCH
+      - HUSK
+      - DROWNED
+      - STRAY
+  playtime:
+    interval-seconds: 60
+    points-per-interval: 1
+
+rewards:
+  top1:
+    commands:
+      - "give %player% diamond 10"
+      - "eco add %player% 500"
+  top2:
+    commands:
+      - "give %player% diamond 6"
+      - "eco add %player% 300"
+  top3:
+    commands:
+      - "give %player% diamond 3"
+      - "eco add %player% 150"

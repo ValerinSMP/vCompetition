@@ -1,0 +1,72 @@
+name: vCompetition
+version: 1.0.0
+main: com.valerinsmp.vcompetition.VCompetitionPlugin
+api-version: '1.21'
+authors: [ValerinSMP]
+description: Sistema de retos semanales de farmeo con anti-exploit estricto.
+softdepend: [PlaceholderAPI, FancyNpcs]
+
+commands:
+  vcompetition:
+    aliases: [competition, torneos]
+    description: Comando principal de vCompetition
+    usage: /vcompetition admin <start|stop|edit|debug|reload|status|top|addpoints|removepoints|setduration|resetplaced|refreshskins>
+
+permissions:
+  vcompetition.admin:
+    description: Permiso legacy global de administración
+    default: op
+    children:
+      vcompetition.admin.*: true
+  vcompetition.admin.*:
+    description: Todos los subcomandos admin de vCompetition
+    default: op
+    children:
+      vcompetition.admin.start: true
+      vcompetition.admin.stop: true
+      vcompetition.admin.edit: true
+      vcompetition.admin.addpoints: true
+      vcompetition.admin.removepoints: true
+      vcompetition.admin.reload: true
+      vcompetition.admin.status: true
+      vcompetition.admin.top: true
+      vcompetition.admin.setduration: true
+      vcompetition.admin.resetplaced: true
+      vcompetition.admin.refreshskins: true
+      vcompetition.admin.debug: true
+  vcompetition.admin.start:
+    description: Iniciar reto manualmente
+    default: op
+  vcompetition.admin.stop:
+    description: Finalizar reto manualmente
+    default: op
+  vcompetition.admin.edit:
+    description: Editar puntaje absoluto
+    default: op
+  vcompetition.admin.addpoints:
+    description: Agregar puntos a jugador
+    default: op
+  vcompetition.admin.removepoints:
+    description: Quitar puntos a jugador
+    default: op
+  vcompetition.admin.reload:
+    description: Recargar configuración
+    default: op
+  vcompetition.admin.status:
+    description: Ver estado del reto
+    default: op
+  vcompetition.admin.top:
+    description: Ver top del reto
+    default: op
+  vcompetition.admin.setduration:
+    description: Configurar duración en días
+    default: op
+  vcompetition.admin.resetplaced:
+    description: Limpiar cache de bloques colocados
+    default: op
+  vcompetition.admin.refreshskins:
+    description: Forzar actualización de skins de NPC top
+    default: op
+  vcompetition.admin.debug:
+    description: Ver debug técnico
+    default: op

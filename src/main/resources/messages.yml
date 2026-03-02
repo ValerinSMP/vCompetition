@@ -1,0 +1,86 @@
+messages:
+  prefix: '<dark_gray>[</dark_gray><gradient:#FFD166:#FF9F1C>ᴛᴏʀɴᴇᴏꜱ</gradient><dark_gray>]</dark_gray> <reset>'
+
+  challenge-start:
+    - ''
+    - '%prefix%<green>⚔ ¡Inició el torneo de <yellow>%challenge%</yellow>! ¡Compite por el top!</green>'
+    - ''
+  challenge-end:
+    - ''
+    - '%prefix%<red>⌛ El torneo de <yellow>%challenge%</yellow> terminó. Calculando resultados...</red>'
+    - ''
+  winner-global:
+    - ''
+    - '%prefix%<gold>🏆 Ganador: <yellow>%player%</yellow> <gray>con <aqua>%points%</aqua> puntos en <yellow>%challenge%</yellow>.</gray>'
+    - ''
+  winner-top-line: '%prefix%<gray>Top #%rank%: <yellow>%player%</yellow> - <aqua>%points%</aqua></gray>'
+  winner-private: '%prefix%<green>¡Felicidades! Ganaste el torneo de <yellow>%challenge%</yellow> con <aqua>%points%</aqua> puntos.</green>'
+  outrank-private: '%prefix%<yellow>¡Has sido superado por <gold>%player%</gold>! Ahora va en el puesto <gold>#%rank%</gold>.</yellow>'
+  outrank-self: '%prefix%<gray>Subiste al puesto <yellow>#%rank%</yellow> superando a <yellow>%count%</yellow> jugadores.</gray>'
+  outrank-global: '%prefix%<aqua>%player%</aqua> <gray>ha superado a <yellow>%victim%</yellow> y subió al puesto <yellow>#%rank%</yellow>.</gray>'
+  outrank-global-summary: '%prefix%<aqua>%player%</aqua> <gray>acaba de superar a <yellow>%count%</yellow> jugadores en el torneo.</gray>'
+
+  status-no-active: '&cNo hay torneo activo.'
+  status-active: '<green>Torneo activo:</green> <yellow>%challenge%</yellow> <gray>| Tiempo restante: <aqua>%time_left%</aqua></gray>'
+  top-header: '<gray>------ <aqua>Top Actual</aqua> ------</gray>'
+  top-line: '<yellow>#%rank%</yellow> <white>%player%</white> <gray>- <aqua>%points%</aqua>'
+  top-empty: '&7No hay participantes todavía.'
+
+  help:
+    general:
+      - '&7Comandos disponibles:'
+      - '&f/%label% status'
+      - '&f/%label% top'
+      - '&f/%label% admin'
+    admin:
+      - '&7Comandos admin:'
+      - '&f/%label% admin start <MINING|WOODCUTTING|FISHING|SLAYER|PLAYTIME>'
+      - '&f/%label% admin stop'
+      - '&f/%label% admin status'
+      - '&f/%label% admin top'
+      - '&f/%label% admin edit <jugador> <puntos>'
+      - '&f/%label% admin addpoints <jugador> <puntos>'
+      - '&f/%label% admin removepoints <jugador> <puntos>'
+      - '&f/%label% admin setduration <dias>'
+      - '&f/%label% admin resetplaced'
+      - '&f/%label% admin refreshskins'
+      - '&f/%label% admin reload'
+      - '&f/%label% admin debug'
+
+  admin:
+    usage-main: '&cUso: /%label% admin <start|stop|edit|debug|reload|status|top|addpoints|removepoints|setduration|resetplaced|refreshskins>'
+    no-permission: '&cNo tienes permisos para este subcomando.'
+    usage-start: '&cUso: /%label% admin start <reto>'
+    started: '&aTorneo iniciado: &e%challenge%'
+    invalid-challenge: '&cReto inválido. Usa: MINING, WOODCUTTING, FISHING, SLAYER, PLAYTIME'
+    no-active: '&cNo hay torneo activo.'
+    stopped: '&aTorneo finalizado manualmente.'
+    reload-success: '&aConfiguración recargada.'
+    usage-setduration: '&cUso: /%label% admin setduration <dias>'
+    invalid-number: '&cDebes ingresar un número válido.'
+    min-duration: '&cLa duración mínima es 1 día.'
+    duration-updated: '&aDuración actualizada a &e%days% &adías.'
+    reset-placed: '&aRegistro de bloques colocados reiniciado.'
+    refreshskins-success: '&aActualización forzada de skins ejecutada.'
+    refreshskins-failed: '&cNo se pudo actualizar skins. Revisa si FancyNpcs y skin-refresh están habilitados.'
+    invalid-subcommand: '&cSubcomando inválido.'
+
+  point-edit:
+    usage: '&cUso: /%label% admin %operation% <jugador> <puntos>'
+    no-active: '&cNo hay torneo activo.'
+    invalid-points: '&cPuntos inválidos.'
+    invalid-player: '&cJugador inválido.'
+    updated: '&aPuntaje actualizado: &e%player% &7-> &b%points%'
+
+  debug:
+    header: '&7------ &bvCompetition Debug &7------'
+    db-connected: '&fDB conectada: &a%value%'
+    db-active-tasks: '&fDB tareas activas: &e%value%'
+    db-queue-size: '&fDB cola pendiente: &e%value%'
+    db-pending-futures: '&fDB futures pendientes: &e%value%'
+    challenge-active: '&fTorneo activo: &a%value%'
+    participants: '&fParticipantes cargados: &b%value%'
+    placed-cache: '&fPlaced blocks cache: &d%value%'
+    papi-registered: '&fPAPI registrado: &6%value%'
+    end-task-active: '&fTask fin torneo activa: &6%value%'
+    schedule-managed: '&fSchedule managed: &b%value%'

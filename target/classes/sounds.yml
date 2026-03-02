@@ -1,0 +1,18 @@
+sounds:
+  tournament-start:
+    enabled: true
+    sound: BLOCK_BEACON_POWER_SELECT
+    volume: 0.45
+    pitch: 1.0
+
+  tournament-end:
+    enabled: true
+    sound: BLOCK_BEACON_DEACTIVATE
+    volume: 0.40
+    pitch: 1.0
+
+  outrank:
+    enabled: true
+    sound: BLOCK_NOTE_BLOCK_BIT
+    volume: 0.35
+    pitch: 1.2
