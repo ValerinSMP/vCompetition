@@ -11,12 +11,18 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class WeeklyScheduleService {
+    private static final String LAST_RANDOM_CHALLENGE_PATH = "schedule.last-random-challenge";
+
     private final VCompetitionPlugin plugin;
     private BukkitTask task;
     private Boolean lastInsideWindow;
+    private boolean suppressAutoStartUntilWindowExit;
 
     public WeeklyScheduleService(VCompetitionPlugin plugin) {
         this.plugin = plugin;
@@ -29,6 +35,7 @@ public final class WeeklyScheduleService {
             return;
         }
         lastInsideWindow = null;
+        suppressAutoStartUntilWindowExit = false;
         long interval = Math.max(20L, config.getLong("schedule.check-interval-ticks", 600L));
         task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 40L, interval);
     }
@@ -39,6 +46,11 @@ public final class WeeklyScheduleService {
             task = null;
         }
         lastInsideWindow = null;
+        suppressAutoStartUntilWindowExit = false;
+    }
+
+    public void suppressAutoStartUntilWindowExit() {
+        suppressAutoStartUntilWindowExit = true;
     }
 
     private void tick() {
@@ -48,25 +60,32 @@ public final class WeeklyScheduleService {
 
             boolean inside = !now.isBefore(window.start) && now.isBefore(window.end);
             boolean startOnBootstrapInsideWindow = plugin.getConfig().getBoolean("schedule.start-on-bootstrap-if-inside-window", false);
+            boolean bootstrapTick = lastInsideWindow == null;
 
-            if (lastInsideWindow == null) {
+            if (bootstrapTick) {
                 lastInsideWindow = inside;
                 if (!inside) {
                     return;
                 }
                 if (!startOnBootstrapInsideWindow) {
+                    suppressAutoStartUntilWindowExit = true;
                     return;
                 }
             }
 
             if (inside) {
-                if (!plugin.hasActiveChallenge() && !Boolean.TRUE.equals(lastInsideWindow)) {
+                if (suppressAutoStartUntilWindowExit && !plugin.hasActiveChallenge()) {
+                    lastInsideWindow = true;
+                    return;
+                }
+                if (!plugin.hasActiveChallenge()) {
                     plugin.startScheduledChallenge(readConfiguredChallenge());
                 }
                 lastInsideWindow = true;
                 return;
             }
 
+            suppressAutoStartUntilWindowExit = false;
             if (plugin.isScheduleManagedChallengeActive()) {
                 plugin.stopScheduledChallenge();
             }
@@ -78,11 +97,47 @@ public final class WeeklyScheduleService {
 
     private ChallengeType readConfiguredChallenge() {
         String raw = plugin.getConfig().getString("schedule.challenge", "MINING");
+        if (raw != null && raw.equalsIgnoreCase("RANDOM")) {
+            return pickRandomChallengeNoRepeat();
+        }
         try {
             return ChallengeType.fromInput(raw == null ? "MINING" : raw);
         } catch (IllegalArgumentException exception) {
             plugin.getLogger().warning("schedule.challenge inválido: " + raw + ". Usando MINING.");
             return ChallengeType.MINING;
+        }
+    }
+
+    private ChallengeType pickRandomChallengeNoRepeat() {
+        ChallengeType previous = readLastRandomChallenge();
+        List<ChallengeType> pool = new ArrayList<>();
+        for (ChallengeType challengeType : ChallengeType.values()) {
+            if (challengeType != previous) {
+                pool.add(challengeType);
+            }
+        }
+
+        if (pool.isEmpty()) {
+            for (ChallengeType challengeType : ChallengeType.values()) {
+                pool.add(challengeType);
+            }
+        }
+
+        ChallengeType selected = pool.get(ThreadLocalRandom.current().nextInt(pool.size()));
+        plugin.getConfig().set(LAST_RANDOM_CHALLENGE_PATH, selected.name());
+        plugin.saveConfig();
+        return selected;
+    }
+
+    private ChallengeType readLastRandomChallenge() {
+        String raw = plugin.getConfig().getString(LAST_RANDOM_CHALLENGE_PATH, "");
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return ChallengeType.fromInput(raw);
+        } catch (IllegalArgumentException exception) {
+            return null;
         }
     }
 

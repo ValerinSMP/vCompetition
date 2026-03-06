@@ -25,12 +25,14 @@ Competiciones semanales para el Server de ValerinSMP
 - Ejemplo incluido: inicio lunes 18:00 y fin domingo 22:00 en `America/Santiago`.
 - Campos importantes:
 	- `schedule.enabled`
-	- `schedule.start-on-bootstrap-if-inside-window` (recomendado `false` para evitar auto-start tras load/reload)
+	- `schedule.start-on-bootstrap-if-inside-window` (si está en `true`, al iniciar/reload dentro de la ventana semanal arrancará el torneo automáticamente)
 	- `schedule.timezone`
-	- `schedule.challenge`
+	- `schedule.challenge` (tipo fijo o `RANDOM`)
 	- `schedule.start.day|hour|minute`
 	- `schedule.end.day|hour|minute`
 	- `schedule.check-interval-ticks`
+- Si un torneo termina manualmente dentro de la ventana (por ejemplo miércoles), el scheduler volverá a iniciar uno automáticamente hasta el cierre configurado (por ejemplo domingo), y luego continuará con el ciclo normal del lunes.
+- Si `schedule.challenge` está en `RANDOM`, cada semana elige un reto aleatorio distinto al de la semana anterior.
 
 ## Auto-refresh de skins (FancyNpcs)
 - Integración opcional vía `softdepend` (si FancyNpcs no está instalado, se ignora).
@@ -69,7 +71,9 @@ Competiciones semanales para el Server de ValerinSMP
 
 ## Administración
 - `/vcompetition admin start <MINING|WOODCUTTING|FISHING|SLAYER>`
+- `/vcompetition admin startuntilsunday <MINING|WOODCUTTING|FISHING|SLAYER|PLAYTIME>`
 - `/vcompetition admin stop`
+- `/vcompetition admin stopnorewards`
 - `/vcompetition admin edit <jugador> <puntos>`
 - `/vcompetition admin addpoints <jugador> <puntos>`
 - `/vcompetition admin removepoints <jugador> <puntos>`
@@ -85,7 +89,9 @@ Competiciones semanales para el Server de ValerinSMP
 - `vcompetition.admin` (legacy, incluye todos)
 - `vcompetition.admin.*`
 - `vcompetition.admin.start`
+- `vcompetition.admin.startuntilsunday`
 - `vcompetition.admin.stop`
+- `vcompetition.admin.stopnorewards`
 - `vcompetition.admin.edit`
 - `vcompetition.admin.addpoints`
 - `vcompetition.admin.removepoints`

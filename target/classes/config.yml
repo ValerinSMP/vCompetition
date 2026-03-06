@@ -17,7 +17,7 @@ schedule:
   enabled: true
   start-on-bootstrap-if-inside-window: false
   timezone: "America/Santiago"
-  challenge: "MINING"
+  challenge: "RANDOM" # RANDOM o un tipo fijo: MINING|WOODCUTTING|FISHING|SLAYER|PLAYTIME
   start:
     day: "MONDAY"
     hour: 18
@@ -71,6 +71,7 @@ competition-types:
       - DARK_OAK_LOG
       - MANGROVE_LOG
       - CHERRY_LOG
+      - pale_oak_log
       - CRIMSON_STEM
       - WARPED_STEM
   fishing:

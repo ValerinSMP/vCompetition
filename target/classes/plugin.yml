@@ -10,7 +10,7 @@ commands:
   vcompetition:
     aliases: [competition, torneos]
     description: Comando principal de vCompetition
-    usage: /vcompetition admin <start|stop|edit|debug|reload|status|top|addpoints|removepoints|setduration|resetplaced|refreshskins>
+    usage: /vcompetition admin <start|startuntilsunday|stop|stopnorewards|edit|debug|reload|status|top|addpoints|removepoints|setduration|resetplaced|refreshskins>
 
 permissions:
   vcompetition.admin:
@@ -23,7 +23,9 @@ permissions:
     default: op
     children:
       vcompetition.admin.start: true
+      vcompetition.admin.startuntilsunday: true
       vcompetition.admin.stop: true
+      vcompetition.admin.stopnorewards: true
       vcompetition.admin.edit: true
       vcompetition.admin.addpoints: true
       vcompetition.admin.removepoints: true
@@ -37,8 +39,14 @@ permissions:
   vcompetition.admin.start:
     description: Iniciar reto manualmente
     default: op
+  vcompetition.admin.startuntilsunday:
+    description: Iniciar reto hasta el cierre semanal configurado
+    default: op
   vcompetition.admin.stop:
     description: Finalizar reto manualmente
+    default: op
+  vcompetition.admin.stopnorewards:
+    description: Detener reto sin recompensas ni anuncio global
     default: op
   vcompetition.admin.edit:
     description: Editar puntaje absoluto

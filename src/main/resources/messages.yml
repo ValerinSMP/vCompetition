@@ -35,7 +35,9 @@ messages:
     admin:
       - '&7Comandos admin:'
       - '&f/%label% admin start <MINING|WOODCUTTING|FISHING|SLAYER|PLAYTIME>'
+      - '&f/%label% admin startuntilsunday <MINING|WOODCUTTING|FISHING|SLAYER|PLAYTIME>'
       - '&f/%label% admin stop'
+      - '&f/%label% admin stopnorewards'
       - '&f/%label% admin status'
       - '&f/%label% admin top'
       - '&f/%label% admin edit <jugador> <puntos>'
@@ -48,13 +50,16 @@ messages:
       - '&f/%label% admin debug'
 
   admin:
-    usage-main: '&cUso: /%label% admin <start|stop|edit|debug|reload|status|top|addpoints|removepoints|setduration|resetplaced|refreshskins>'
+    usage-main: '&cUso: /%label% admin <start|startuntilsunday|stop|stopnorewards|edit|debug|reload|status|top|addpoints|removepoints|setduration|resetplaced|refreshskins>'
     no-permission: '&cNo tienes permisos para este subcomando.'
     usage-start: '&cUso: /%label% admin start <reto>'
+    usage-start-until-sunday: '&cUso: /%label% admin startuntilsunday <reto>'
     started: '&aTorneo iniciado: &e%challenge%'
+    started-until-sunday: '&aTorneo iniciado hasta el cierre semanal: &e%challenge%'
     invalid-challenge: '&cReto inválido. Usa: MINING, WOODCUTTING, FISHING, SLAYER, PLAYTIME'
     no-active: '&cNo hay torneo activo.'
     stopped: '&aTorneo finalizado manualmente.'
+    stopped-no-rewards: '&eTorneo detenido sin recompensas. Autoinicio pausado hasta el fin de la ventana semanal.'
     reload-success: '&aConfiguración recargada.'
     usage-setduration: '&cUso: /%label% admin setduration <dias>'
     invalid-number: '&cDebes ingresar un número válido.'

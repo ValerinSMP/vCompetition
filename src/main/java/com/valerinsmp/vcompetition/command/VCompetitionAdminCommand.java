@@ -59,7 +59,9 @@ public final class VCompetitionAdminCommand implements TabExecutor {
             plugin.getMessageService().sendPath(sender, "messages.help.admin", List.of(
                             "&7Comandos admin:",
                             "&f/%label% admin start <MINING|WOODCUTTING|FISHING|SLAYER|PLAYTIME>",
+                            "&f/%label% admin startuntilsunday <MINING|WOODCUTTING|FISHING|SLAYER|PLAYTIME>",
                             "&f/%label% admin stop",
+                            "&f/%label% admin stopnorewards",
                             "&f/%label% admin status",
                             "&f/%label% admin top",
                             "&f/%label% admin edit <jugador> <puntos>",
@@ -98,6 +100,22 @@ public final class VCompetitionAdminCommand implements TabExecutor {
                 }
                 return true;
             }
+            case "startuntilsunday" -> {
+                if (args.length < 3) {
+                    plugin.getMessageService().sendPath(sender, "messages.admin.usage-start-until-sunday", List.of("&cUso: /%label% admin startuntilsunday <reto>"),
+                            plugin.getMessageService().placeholders("%label%", label));
+                    return true;
+                }
+                try {
+                    ChallengeType type = ChallengeType.fromInput(args[2]);
+                    plugin.startAdminChallengeUntilScheduleEnd(type);
+                    plugin.getMessageService().sendPath(sender, "messages.admin.started-until-sunday", List.of("&aTorneo iniciado hasta el cierre semanal: &e%challenge%"),
+                            plugin.getMessageService().placeholders("%challenge%", type.displayName()));
+                } catch (IllegalArgumentException exception) {
+                    plugin.getMessageService().sendPath(sender, "messages.admin.invalid-challenge", List.of("&cReto inválido. Usa: MINING, WOODCUTTING, FISHING, SLAYER, PLAYTIME"), Collections.emptyMap());
+                }
+                return true;
+            }
             case "stop" -> {
                 if (!plugin.hasActiveChallenge()) {
                     plugin.getMessageService().sendPath(sender, "messages.admin.no-active", List.of("&cNo hay torneo activo."), Collections.emptyMap());
@@ -105,6 +123,15 @@ public final class VCompetitionAdminCommand implements TabExecutor {
                 }
                 plugin.stopAdminChallenge();
                 plugin.getMessageService().sendPath(sender, "messages.admin.stopped", List.of("&aTorneo finalizado manualmente."), Collections.emptyMap());
+                return true;
+            }
+            case "stopnorewards" -> {
+                if (!plugin.hasActiveChallenge()) {
+                    plugin.getMessageService().sendPath(sender, "messages.admin.no-active", List.of("&cNo hay torneo activo."), Collections.emptyMap());
+                    return true;
+                }
+                plugin.stopAdminChallengeNoRewards();
+                plugin.getMessageService().sendPath(sender, "messages.admin.stopped-no-rewards", List.of("&eTorneo detenido sin recompensas."), Collections.emptyMap());
                 return true;
             }
             case "edit" -> {
@@ -182,7 +209,7 @@ public final class VCompetitionAdminCommand implements TabExecutor {
             return filterPrefix(List.of("admin", "status", "top", "help"), args[0]);
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("admin")) {
-            List<String> subcommands = List.of("start", "stop", "edit", "debug", "reload", "status", "top", "addpoints", "removepoints", "setduration", "resetplaced", "refreshskins");
+            List<String> subcommands = List.of("start", "startuntilsunday", "stop", "stopnorewards", "edit", "debug", "reload", "status", "top", "addpoints", "removepoints", "setduration", "resetplaced", "refreshskins");
             List<String> allowed = new ArrayList<>();
             for (String sub : subcommands) {
                 if (hasSubPermission(sender, sub)) {
@@ -191,7 +218,7 @@ public final class VCompetitionAdminCommand implements TabExecutor {
             }
             return filterPrefix(allowed, args[1]);
         }
-        if (args.length == 3 && args[0].equalsIgnoreCase("admin") && args[1].equalsIgnoreCase("start")) {
+        if (args.length == 3 && args[0].equalsIgnoreCase("admin") && (args[1].equalsIgnoreCase("start") || args[1].equalsIgnoreCase("startuntilsunday"))) {
             return filterPrefix(List.of("MINING", "WOODCUTTING", "FISHING", "SLAYER", "PLAYTIME"), args[2]);
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("admin") && List.of("edit", "addpoints", "removepoints").contains(args[1].toLowerCase(Locale.ROOT))) {

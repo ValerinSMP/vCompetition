@@ -238,9 +238,24 @@ public final class VCompetitionPlugin extends JavaPlugin {
         }
     }
 
+    public void startAdminChallengeUntilScheduleEnd(ChallengeType type) {
+        if (competitionService != null) {
+            competitionService.startAdminChallengeUntilScheduleEnd(type);
+        }
+    }
+
     public void stopAdminChallenge() {
         if (competitionService != null) {
             competitionService.stopAdminChallenge();
+        }
+    }
+
+    public void stopAdminChallengeNoRewards() {
+        if (competitionService != null) {
+            competitionService.stopAdminChallengeNoRewards();
+        }
+        if (weeklyScheduleService != null) {
+            weeklyScheduleService.suppressAutoStartUntilWindowExit();
         }
     }
 

@@ -14,6 +14,12 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -368,14 +374,25 @@ public final class CompetitionService {
         startChallenge(type, true);
     }
 
+    public void startAdminChallengeUntilScheduleEnd(ChallengeType type) {
+        scheduleManagedChallenge = true;
+        Long forcedEnd = calculateNextScheduledEndMillis();
+        startChallenge(type, true, forcedEnd);
+    }
+
     public void stopAdminChallenge() {
         scheduleManagedChallenge = false;
         stopChallenge(true);
     }
 
+    public void stopAdminChallengeNoRewards() {
+        scheduleManagedChallenge = false;
+        stopChallenge(false);
+    }
+
     public void startScheduledChallenge(ChallengeType type) {
         scheduleManagedChallenge = true;
-        startChallenge(type, true);
+        startChallenge(type, true, calculateNextScheduledEndMillis());
     }
 
     public void stopScheduledChallenge() {
@@ -485,13 +502,18 @@ public final class CompetitionService {
     }
 
     private void startChallenge(ChallengeType challengeType, boolean announce) {
+        startChallenge(challengeType, announce, null);
+    }
+
+    private void startChallenge(ChallengeType challengeType, boolean announce, Long forcedEndMillis) {
         if (activeChallenge != null) {
             stopChallenge(false);
         }
 
         activeChallenge = challengeType;
         challengeStart = System.currentTimeMillis();
-        challengeEnd = challengeStart + (plugin.getConfig().getLong("challenge.duration-days", 7L) * 24L * 60L * 60L * 1000L);
+        long defaultEnd = challengeStart + (plugin.getConfig().getLong("challenge.duration-days", 7L) * 24L * 60L * 60L * 1000L);
+        challengeEnd = (forcedEndMillis != null && forcedEndMillis > challengeStart) ? forcedEndMillis : defaultEnd;
 
         scores.clear();
         names.clear();
@@ -546,6 +568,56 @@ public final class CompetitionService {
         lastOutrankGlobalServerAt = 0L;
 
         sqliteManager.saveChallengeState(null, 0L, 0L, false);
+    }
+
+    private Long calculateNextScheduledEndMillis() {
+        try {
+            ZoneId zoneId = ZoneId.of(plugin.getConfig().getString("schedule.timezone", "America/Santiago"));
+
+            DayOfWeek startDay = DayOfWeek.valueOf(plugin.getConfig().getString("schedule.start.day", "MONDAY").toUpperCase(Locale.ROOT));
+            int startHour = clamp(plugin.getConfig().getInt("schedule.start.hour", 18), 0, 23);
+            int startMinute = clamp(plugin.getConfig().getInt("schedule.start.minute", 0), 0, 59);
+
+            DayOfWeek endDay = DayOfWeek.valueOf(plugin.getConfig().getString("schedule.end.day", "SUNDAY").toUpperCase(Locale.ROOT));
+            int endHour = clamp(plugin.getConfig().getInt("schedule.end.hour", 22), 0, 23);
+            int endMinute = clamp(plugin.getConfig().getInt("schedule.end.minute", 0), 0, 59);
+
+            ZonedDateTime now = ZonedDateTime.now(zoneId);
+
+            LocalDate weekStartDate = now.toLocalDate();
+            while (weekStartDate.getDayOfWeek() != startDay) {
+                weekStartDate = weekStartDate.minusDays(1);
+            }
+
+            ZonedDateTime start = ZonedDateTime.of(LocalDateTime.of(weekStartDate, LocalTime.of(startHour, startMinute)), zoneId);
+
+            LocalDate weekEndDate = weekStartDate;
+            while (weekEndDate.getDayOfWeek() != endDay) {
+                weekEndDate = weekEndDate.plusDays(1);
+            }
+            ZonedDateTime end = ZonedDateTime.of(LocalDateTime.of(weekEndDate, LocalTime.of(endHour, endMinute)), zoneId);
+            if (!end.isAfter(start)) {
+                end = end.plusWeeks(1);
+            }
+
+            if (now.isBefore(start)) {
+                start = start.minusWeeks(1);
+                end = end.minusWeeks(1);
+            }
+
+            while (!end.isAfter(now)) {
+                end = end.plusWeeks(1);
+            }
+
+            return end.toInstant().toEpochMilli();
+        } catch (Exception exception) {
+            plugin.getLogger().warning("No se pudo calcular fin semanal programado, usando duración por defecto: " + exception.getMessage());
+            return null;
+        }
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private void applyRewardsAndAnnounceWinners(ChallengeType challengeType, List<VCompetitionPlugin.RankingEntry> ranking) {
