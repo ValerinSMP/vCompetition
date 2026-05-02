@@ -247,12 +247,104 @@ public final class SQLiteManager {
         return track(task);
     }
 
+    public CompletableFuture<Void> batchAddPlacedBlocks(Set<BlockKey> blocks) {
+        if (blocks.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        Set<BlockKey> snapshot = new java.util.HashSet<>(blocks);
+        CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
+            String sql = "INSERT OR IGNORE INTO placed_blocks(world, x, y, z) VALUES (?, ?, ?, ?)";
+            try {
+                connection.setAutoCommit(false);
+                try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                    for (BlockKey key : snapshot) {
+                        statement.setString(1, key.world());
+                        statement.setInt(2, key.x());
+                        statement.setInt(3, key.y());
+                        statement.setInt(4, key.z());
+                        statement.addBatch();
+                    }
+                    statement.executeBatch();
+                }
+                connection.commit();
+            } catch (SQLException exception) {
+                try { connection.rollback(); } catch (SQLException ignored) {}
+                throw new RuntimeException("No se pudo batch-insertar placed_blocks", exception);
+            } finally {
+                try { connection.setAutoCommit(true); } catch (SQLException ignored) {}
+            }
+        }, executor);
+        return track(task);
+    }
+
+    public CompletableFuture<Void> batchRemovePlacedBlocks(Set<BlockKey> blocks) {
+        if (blocks.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        Set<BlockKey> snapshot = new java.util.HashSet<>(blocks);
+        CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
+            String sql = "DELETE FROM placed_blocks WHERE world = ? AND x = ? AND y = ? AND z = ?";
+            try {
+                connection.setAutoCommit(false);
+                try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                    for (BlockKey key : snapshot) {
+                        statement.setString(1, key.world());
+                        statement.setInt(2, key.x());
+                        statement.setInt(3, key.y());
+                        statement.setInt(4, key.z());
+                        statement.addBatch();
+                    }
+                    statement.executeBatch();
+                }
+                connection.commit();
+            } catch (SQLException exception) {
+                try { connection.rollback(); } catch (SQLException ignored) {}
+                throw new RuntimeException("No se pudo batch-eliminar placed_blocks", exception);
+            } finally {
+                try { connection.setAutoCommit(true); } catch (SQLException ignored) {}
+            }
+        }, executor);
+        return track(task);
+    }
+
     public CompletableFuture<Void> clearPlacedBlocks() {
         CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
             try (Statement statement = connection.createStatement()) {
                 statement.executeUpdate("DELETE FROM placed_blocks");
             } catch (SQLException exception) {
                 throw new RuntimeException("No se pudo limpiar placed_blocks", exception);
+            }
+        }, executor);
+        return track(task);
+    }
+
+    public CompletableFuture<Void> batchUpsertPlayerScores(ChallengeType challengeType, Map<UUID, Integer> scores, Map<UUID, String> names) {
+        if (scores.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        Map<UUID, Integer> snapshot = new java.util.HashMap<>(scores);
+        CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
+            String sql = "INSERT INTO player_progress (challenge_type, player_uuid, player_name, points) VALUES (?, ?, ?, ?) "
+                    + "ON CONFLICT(challenge_type, player_uuid) DO UPDATE SET player_name = excluded.player_name, points = excluded.points";
+            try {
+                connection.setAutoCommit(false);
+                try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                    for (Map.Entry<UUID, Integer> entry : snapshot.entrySet()) {
+                        UUID uuid = entry.getKey();
+                        statement.setString(1, challengeType.name());
+                        statement.setString(2, uuid.toString());
+                        statement.setString(3, names.getOrDefault(uuid, "Unknown"));
+                        statement.setInt(4, entry.getValue());
+                        statement.addBatch();
+                    }
+                    statement.executeBatch();
+                }
+                connection.commit();
+            } catch (SQLException exception) {
+                try { connection.rollback(); } catch (SQLException ignored) {}
+                throw new RuntimeException("No se pudo guardar batch de scores", exception);
+            } finally {
+                try { connection.setAutoCommit(true); } catch (SQLException ignored) {}
             }
         }, executor);
         return track(task);

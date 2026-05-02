@@ -58,8 +58,8 @@ public final class VCompetitionAdminCommand implements TabExecutor {
         if (args.length == 1) {
             plugin.getMessageService().sendPath(sender, "messages.help.admin", List.of(
                             "&7Comandos admin:",
-                            "&f/%label% admin start <MINING|WOODCUTTING|FISHING|SLAYER|PLAYTIME>",
-                            "&f/%label% admin startuntilsunday <MINING|WOODCUTTING|FISHING|SLAYER|PLAYTIME>",
+                            "&f/%label% admin start <MINING|WOODCUTTING|FISHING|SLAYER|FARMING>",
+                            "&f/%label% admin startuntilsunday <MINING|WOODCUTTING|FISHING|SLAYER|FARMING>",
                             "&f/%label% admin stop",
                             "&f/%label% admin stopnorewards",
                             "&f/%label% admin status",
@@ -67,7 +67,7 @@ public final class VCompetitionAdminCommand implements TabExecutor {
                             "&f/%label% admin edit <jugador> <puntos>",
                             "&f/%label% admin addpoints <jugador> <puntos>",
                             "&f/%label% admin removepoints <jugador> <puntos>",
-                            "&f/%label% admin setduration <dias>",
+                            "&f/%label% admin setduration <minutos>",
                             "&f/%label% admin resetplaced",
                                 "&f/%label% admin refreshskins",
                             "&f/%label% admin reload",
@@ -96,7 +96,7 @@ public final class VCompetitionAdminCommand implements TabExecutor {
                     plugin.getMessageService().sendPath(sender, "messages.admin.started", List.of("&aTorneo iniciado: &e%challenge%"),
                             plugin.getMessageService().placeholders("%challenge%", type.displayName()));
                 } catch (IllegalArgumentException exception) {
-                    plugin.getMessageService().sendPath(sender, "messages.admin.invalid-challenge", List.of("&cReto inválido. Usa: MINING, WOODCUTTING, FISHING, SLAYER, PLAYTIME"), Collections.emptyMap());
+                    plugin.getMessageService().sendPath(sender, "messages.admin.invalid-challenge", List.of("&cReto inválido. Usa: MINING, WOODCUTTING, FISHING, SLAYER, FARMING"), Collections.emptyMap());
                 }
                 return true;
             }
@@ -109,10 +109,10 @@ public final class VCompetitionAdminCommand implements TabExecutor {
                 try {
                     ChallengeType type = ChallengeType.fromInput(args[2]);
                     plugin.startAdminChallengeUntilScheduleEnd(type);
-                    plugin.getMessageService().sendPath(sender, "messages.admin.started-until-sunday", List.of("&aTorneo iniciado hasta el cierre semanal: &e%challenge%"),
+                    plugin.getMessageService().sendPath(sender, "messages.admin.started-until-sunday", List.of("&aTorneo iniciado hasta el cierre del slot: &e%challenge%"),
                             plugin.getMessageService().placeholders("%challenge%", type.displayName()));
                 } catch (IllegalArgumentException exception) {
-                    plugin.getMessageService().sendPath(sender, "messages.admin.invalid-challenge", List.of("&cReto inválido. Usa: MINING, WOODCUTTING, FISHING, SLAYER, PLAYTIME"), Collections.emptyMap());
+                    plugin.getMessageService().sendPath(sender, "messages.admin.invalid-challenge", List.of("&cReto inválido. Usa: MINING, WOODCUTTING, FISHING, SLAYER, FARMING"), Collections.emptyMap());
                 }
                 return true;
             }
@@ -158,24 +158,24 @@ public final class VCompetitionAdminCommand implements TabExecutor {
             }
             case "setduration" -> {
                 if (args.length < 3) {
-                    plugin.getMessageService().sendPath(sender, "messages.admin.usage-setduration", List.of("&cUso: /%label% admin setduration <dias>"),
+                    plugin.getMessageService().sendPath(sender, "messages.admin.usage-setduration", List.of("&cUso: /%label% admin setduration <minutos>"),
                             plugin.getMessageService().placeholders("%label%", label));
                     return true;
                 }
-                long days;
+                long minutes;
                 try {
-                    days = Long.parseLong(args[2]);
+                    minutes = Long.parseLong(args[2]);
                 } catch (NumberFormatException exception) {
                     plugin.getMessageService().sendPath(sender, "messages.admin.invalid-number", List.of("&cDebes ingresar un número válido."), Collections.emptyMap());
                     return true;
                 }
-                if (days < 1) {
-                    plugin.getMessageService().sendPath(sender, "messages.admin.min-duration", List.of("&cLa duración mínima es 1 día."), Collections.emptyMap());
+                if (minutes < 1) {
+                    plugin.getMessageService().sendPath(sender, "messages.admin.min-duration", List.of("&cLa duración mínima es 1 minuto."), Collections.emptyMap());
                     return true;
                 }
-                plugin.updateDurationDays(days);
-                plugin.getMessageService().sendPath(sender, "messages.admin.duration-updated", List.of("&aDuración actualizada a &e%days% &adías."),
-                        plugin.getMessageService().placeholders("%days%", String.valueOf(days)));
+                plugin.updateDurationMinutes(minutes);
+                plugin.getMessageService().sendPath(sender, "messages.admin.duration-updated", List.of("&aDuración actualizada a &e%minutes% &aminutos."),
+                        plugin.getMessageService().placeholders("%minutes%", String.valueOf(minutes)));
                 return true;
             }
             case "resetplaced" -> {
@@ -219,7 +219,7 @@ public final class VCompetitionAdminCommand implements TabExecutor {
             return filterPrefix(allowed, args[1]);
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("admin") && (args[1].equalsIgnoreCase("start") || args[1].equalsIgnoreCase("startuntilsunday"))) {
-            return filterPrefix(List.of("MINING", "WOODCUTTING", "FISHING", "SLAYER", "PLAYTIME"), args[2]);
+            return filterPrefix(List.of("MINING", "WOODCUTTING", "FISHING", "SLAYER", "FARMING"), args[2]);
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("admin") && List.of("edit", "addpoints", "removepoints").contains(args[1].toLowerCase(Locale.ROOT))) {
             List<String> online = new ArrayList<>();

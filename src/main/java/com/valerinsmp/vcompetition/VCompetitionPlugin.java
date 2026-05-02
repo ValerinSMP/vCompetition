@@ -9,7 +9,7 @@ import com.valerinsmp.vcompetition.service.CompetitionService;
 import com.valerinsmp.vcompetition.service.FancyNpcSkinRefreshService;
 import com.valerinsmp.vcompetition.service.MessageService;
 import com.valerinsmp.vcompetition.service.SoundService;
-import com.valerinsmp.vcompetition.service.WeeklyScheduleService;
+import com.valerinsmp.vcompetition.service.DailyScheduleService;
 import com.valerinsmp.vcompetition.storage.SQLiteManager;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -29,7 +29,7 @@ public final class VCompetitionPlugin extends JavaPlugin {
     private MessageService messageService;
     private SoundService soundService;
     private CompetitionService competitionService;
-    private WeeklyScheduleService weeklyScheduleService;
+    private DailyScheduleService dailyScheduleService;
     private FancyNpcSkinRefreshService fancyNpcSkinRefreshService;
     private VCompetitionPlaceholderExpansion placeholderExpansion;
 
@@ -62,8 +62,8 @@ public final class VCompetitionPlugin extends JavaPlugin {
             getCommand("vcompetition").setTabCompleter(adminCommand);
         }
 
-        weeklyScheduleService = new WeeklyScheduleService(this);
-        weeklyScheduleService.start();
+        dailyScheduleService = new DailyScheduleService(this);
+        dailyScheduleService.start();
         fancyNpcSkinRefreshService = new FancyNpcSkinRefreshService(this);
         fancyNpcSkinRefreshService.start();
         registerPlaceholders();
@@ -76,9 +76,9 @@ public final class VCompetitionPlugin extends JavaPlugin {
             placeholderExpansion = null;
         }
 
-        if (weeklyScheduleService != null) {
-            weeklyScheduleService.stop();
-            weeklyScheduleService = null;
+        if (dailyScheduleService != null) {
+            dailyScheduleService.stop();
+            dailyScheduleService = null;
         }
 
         if (fancyNpcSkinRefreshService != null) {
@@ -198,6 +198,12 @@ public final class VCompetitionPlugin extends JavaPlugin {
         }
     }
 
+    public void unmarkNaturalEntity(Entity entity) {
+        if (competitionService != null) {
+            competitionService.unmarkNaturalEntity(entity);
+        }
+    }
+
     public boolean isNaturalEntity(Entity entity) {
         return competitionService != null && competitionService.isNaturalEntity(entity);
     }
@@ -212,6 +218,10 @@ public final class VCompetitionPlugin extends JavaPlugin {
 
     public boolean isFishingMaterial(Material material) {
         return competitionService != null && competitionService.isFishingMaterial(material);
+    }
+
+    public boolean isFarmingMaterial(Material material) {
+        return competitionService != null && competitionService.isFarmingMaterial(material);
     }
 
     public boolean isSlayerMob(EntityType entityType) {
@@ -240,7 +250,10 @@ public final class VCompetitionPlugin extends JavaPlugin {
 
     public void startAdminChallengeUntilScheduleEnd(ChallengeType type) {
         if (competitionService != null) {
-            competitionService.startAdminChallengeUntilScheduleEnd(type);
+            long slotEnd = dailyScheduleService != null
+                ? dailyScheduleService.getCurrentOrNextSlotEndMillis()
+                : System.currentTimeMillis() + getConfig().getLong("challenge.duration-minutes", 30L) * 60_000L;
+            competitionService.startAdminChallengeUntilScheduleEnd(type, slotEnd);
         }
     }
 
@@ -254,14 +267,14 @@ public final class VCompetitionPlugin extends JavaPlugin {
         if (competitionService != null) {
             competitionService.stopAdminChallengeNoRewards();
         }
-        if (weeklyScheduleService != null) {
-            weeklyScheduleService.suppressAutoStartUntilWindowExit();
+        if (dailyScheduleService != null) {
+            dailyScheduleService.suppressAutoStartUntilWindowExit();
         }
     }
 
-    public void startScheduledChallenge(ChallengeType type) {
+    public void startScheduledChallenge(ChallengeType type, long slotEndMillis) {
         if (competitionService != null) {
-            competitionService.startScheduledChallenge(type);
+            competitionService.startScheduledChallenge(type, slotEndMillis);
         }
     }
 
@@ -282,8 +295,8 @@ public final class VCompetitionPlugin extends JavaPlugin {
         if (competitionService != null) {
             competitionService.loadCompetitionRules();
         }
-        if (weeklyScheduleService != null) {
-            weeklyScheduleService.start();
+        if (dailyScheduleService != null) {
+            dailyScheduleService.start();
         }
         if (fancyNpcSkinRefreshService != null) {
             fancyNpcSkinRefreshService.start();
@@ -300,9 +313,9 @@ public final class VCompetitionPlugin extends JavaPlugin {
         }
     }
 
-    public void updateDurationDays(long days) {
+    public void updateDurationMinutes(long minutes) {
         if (competitionService != null) {
-            competitionService.updateDurationDays(days);
+            competitionService.updateDurationMinutes(minutes);
         }
     }
 

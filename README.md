@@ -19,6 +19,8 @@ Competiciones semanales para el Server de ValerinSMP
 - Seguimiento de tareas pendientes para vaciar cola antes de cerrar.
 - `onDisable()` cancela tareas, guarda estado, espera pending async y cierra DB.
 - Compatible con reloads tipo PlugMan bajo buenas prácticas (sin hard-kill del proceso).
+- Ranking del torneo con refresh lazy y throttled (no recalcula cada tick).
+- Ajuste de rendimiento disponible: `performance.ranking-refresh-ms` en `config.yml` (subir valor reduce CPU en picos de farmeo masivo).
 
 ## Horario semanal automático
 - Se configura en `schedule` dentro de `config.yml`.

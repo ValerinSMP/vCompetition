@@ -1,5 +1,5 @@
 challenge:
-  duration-days: 7
+  duration-minutes: 30
 
 excluded-worlds:
   - "world_minapvp"
@@ -13,19 +13,19 @@ notifications:
     max-private-victims-per-event: 2
     global-top-cutoff: 3
 
+performance:
+  ranking-refresh-ms: 200
+
 schedule:
   enabled: true
   start-on-bootstrap-if-inside-window: false
   timezone: "America/Santiago"
-  challenge: "RANDOM" # RANDOM o un tipo fijo: MINING|WOODCUTTING|FISHING|SLAYER|PLAYTIME
-  start:
-    day: "MONDAY"
-    hour: 18
-    minute: 0
-  end:
-    day: "SUNDAY"
-    hour: 22
-    minute: 0
+  challenge: "RANDOM" # RANDOM o un tipo fijo: MINING|WOODCUTTING|FISHING|SLAYER|FARMING
+  slots:
+    - hour: 14
+      minute: 0
+    - hour: 20
+      minute: 0
   check-interval-ticks: 600
 
 fancy-npcs:
@@ -91,9 +91,18 @@ competition-types:
       - HUSK
       - DROWNED
       - STRAY
-  playtime:
-    interval-seconds: 60
-    points-per-interval: 1
+  farming:
+    materials:
+      - WHEAT
+      - CARROTS
+      - POTATOES
+      - BEETROOTS
+      - SUGAR_CANE
+      - MELON
+      - PUMPKIN
+      - NETHER_WART
+      - COCOA
+      - SWEET_BERRY_BUSH
 
 rewards:
   top1:

@@ -1,5 +1,6 @@
 package com.valerinsmp.vcompetition.model;
 
+import java.util.List;
 import java.util.Locale;
 
 public enum ChallengeType {
@@ -7,7 +8,7 @@ public enum ChallengeType {
     WOODCUTTING,
     FISHING,
     SLAYER,
-    PLAYTIME;
+    FARMING;
 
     public static ChallengeType fromInput(String input) {
         return ChallengeType.valueOf(input.toUpperCase(Locale.ROOT));
@@ -19,7 +20,12 @@ public enum ChallengeType {
             case WOODCUTTING -> "ᴛᴀʟᴀ";
             case FISHING -> "ᴘᴇꜱᴄᴀ";
             case SLAYER -> "ᴄᴀᴢᴀ";
-            case PLAYTIME -> "ᴛɪᴇᴍᴘᴏ ᴊᴜɢᴀᴅᴏ";
+            case FARMING -> "ꜰᴀʀᴍᴇᴏ";
         };
+    }
+
+    /** Challenge types eligible for random selection. PLAYTIME is excluded. */
+    public static List<ChallengeType> randomPool() {
+        return List.of(MINING, WOODCUTTING, FISHING, SLAYER, FARMING);
     }
 }

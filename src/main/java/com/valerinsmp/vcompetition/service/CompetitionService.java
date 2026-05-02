@@ -14,12 +14,6 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -49,10 +43,9 @@ public final class CompetitionService {
     private volatile Set<Material> miningMaterials = EnumSet.noneOf(Material.class);
     private volatile Set<Material> woodcuttingMaterials = EnumSet.noneOf(Material.class);
     private volatile Set<Material> fishingMaterials = EnumSet.noneOf(Material.class);
+    private volatile Set<Material> farmingMaterials = EnumSet.noneOf(Material.class);
     private volatile Set<EntityType> slayerMobs = EnumSet.noneOf(EntityType.class);
     private volatile Set<String> excludedWorlds = Set.of();
-    private volatile long playtimeIntervalTicks = 1200L;
-    private volatile int playtimePointsPerInterval = 1;
     private volatile long outrankGlobalCooldownMillis = 15000L;
     private volatile long outrankServerGlobalCooldownMillis = 8000L;
     private volatile long outrankPrivateCooldownMillis = 30000L;
@@ -62,12 +55,25 @@ public final class CompetitionService {
     private volatile long lastOutrankGlobalServerAt;
     private volatile boolean runtimeActive;
 
+    private final Map<UUID, Integer> dirtyScores = new ConcurrentHashMap<>();
+    private final Map<UUID, List<UUID>> pendingOutrankBefore = new ConcurrentHashMap<>();
+    private final Set<BlockKey> dirtyPlacedAdd = ConcurrentHashMap.newKeySet();
+    private final Set<BlockKey> dirtyPlacedRemove = ConcurrentHashMap.newKeySet();
+    private volatile BukkitTask flushTask;
+    private volatile BukkitTask placedFlushTask;
+    private BukkitTask outrankTask;
+    private volatile List<UUID> rankSnapshot = List.of();
+    private volatile boolean rankingDirty = true;
+    private volatile long lastRankSnapshotRefreshAt;
+    private volatile long rankingRefreshIntervalMillis = 200L;
+
+    private final Map<String, Boolean> worldExclusionCache = new ConcurrentHashMap<>();
+
     private ChallengeType activeChallenge;
     private long challengeStart;
     private long challengeEnd;
     private boolean scheduleManagedChallenge;
     private BukkitTask endTask;
-    private BukkitTask playtimeTask;
 
     public CompetitionService(VCompetitionPlugin plugin, SQLiteManager sqliteManager) {
         this.plugin = plugin;
@@ -80,27 +86,59 @@ public final class CompetitionService {
 
     public void disableRuntime() {
         runtimeActive = false;
-        stopPlaytimeTicker();
     }
 
     public boolean isRuntimeActive() {
         return runtimeActive;
     }
 
+    private void markRankingDirty() {
+        rankingDirty = true;
+    }
+
+    private void refreshRankSnapshotNow() {
+        rankSnapshot = rankOrdered();
+        rankingDirty = false;
+        lastRankSnapshotRefreshAt = System.currentTimeMillis();
+    }
+
+    private void refreshRankSnapshotIfNeeded() {
+        if (!rankingDirty) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastRankSnapshotRefreshAt < rankingRefreshIntervalMillis) {
+            return;
+        }
+        refreshRankSnapshotNow();
+    }
+
     public void shutdownAndPersist() {
+        rankSnapshot = List.of();
+        rankingDirty = true;
+        if (outrankTask != null) {
+            outrankTask.cancel();
+            outrankTask = null;
+        }
+        pendingOutrankBefore.clear();
+        if (flushTask != null) {
+            flushTask.cancel();
+            flushTask = null;
+        }
+        if (placedFlushTask != null) {
+            placedFlushTask.cancel();
+            placedFlushTask = null;
+        }
+        flushDirtyPlaced();
+        flushDirtyScores();
         if (endTask != null) {
             endTask.cancel();
             endTask = null;
         }
-        stopPlaytimeTicker();
-
         List<CompletableFuture<Void>> pending = new ArrayList<>();
         if (activeChallenge != null) {
             pending.add(sqliteManager.saveChallengeState(activeChallenge, challengeStart, challengeEnd, true));
-            for (Map.Entry<UUID, Integer> entry : scores.entrySet()) {
-                UUID uuid = entry.getKey();
-                pending.add(sqliteManager.upsertPlayerScore(activeChallenge, uuid, names.getOrDefault(uuid, "Unknown"), entry.getValue()));
-            }
+            pending.add(sqliteManager.batchUpsertPlayerScores(activeChallenge, scores, names));
         } else {
             pending.add(sqliteManager.saveChallengeState(null, 0L, 0L, false));
         }
@@ -151,8 +189,9 @@ public final class CompetitionService {
                     scores.put(uuid, score.points());
                     names.put(uuid, score.playerName());
                 });
+                markRankingDirty();
+                refreshRankSnapshotNow();
                 scheduleChallengeEnd();
-                startPlaytimeTickerIfNeeded();
             }
         } catch (Exception exception) {
             plugin.getLogger().warning("No se pudo restaurar estado: " + exception.getMessage());
@@ -183,21 +222,24 @@ public final class CompetitionService {
     }
 
     public int getPlayerPosition(UUID uuid) {
-        List<UUID> ordered = rankOrdered();
+        refreshRankSnapshotIfNeeded();
+        List<UUID> ordered = rankSnapshot;
         int index = ordered.indexOf(uuid);
         return index < 0 ? -1 : index + 1;
     }
 
     public int getGapTopOneToTwo() {
-        List<VCompetitionPlugin.RankingEntry> ranking = getRankingEntries();
-        if (ranking.size() < 2) {
-            return ranking.isEmpty() ? 0 : ranking.get(0).points();
+        refreshRankSnapshotIfNeeded();
+        List<UUID> ordered = rankSnapshot;
+        if (ordered.size() < 2) {
+            return ordered.isEmpty() ? 0 : scores.getOrDefault(ordered.get(0), 0);
         }
-        return ranking.get(0).points() - ranking.get(1).points();
+        return scores.getOrDefault(ordered.get(0), 0) - scores.getOrDefault(ordered.get(1), 0);
     }
 
     public int getGapToAbove(UUID uuid) {
-        List<UUID> ordered = rankOrdered();
+        refreshRankSnapshotIfNeeded();
+        List<UUID> ordered = rankSnapshot;
         int index = ordered.indexOf(uuid);
         if (index <= 0) {
             return 0;
@@ -207,7 +249,8 @@ public final class CompetitionService {
     }
 
     public int getGapToBelow(UUID uuid) {
-        List<UUID> ordered = rankOrdered();
+        refreshRankSnapshotIfNeeded();
+        List<UUID> ordered = rankSnapshot;
         int index = ordered.indexOf(uuid);
         if (index < 0 || index >= ordered.size() - 1) {
             return 0;
@@ -253,7 +296,9 @@ public final class CompetitionService {
             return;
         }
         if (placedBlocks.add(blockKey)) {
-            sqliteManager.addPlacedBlock(blockKey);
+            dirtyPlacedAdd.add(blockKey);
+            dirtyPlacedRemove.remove(blockKey);
+            schedulePlacedFlush();
         }
     }
 
@@ -264,7 +309,9 @@ public final class CompetitionService {
         if (!placedBlocks.remove(blockKey)) {
             return false;
         }
-        sqliteManager.removePlacedBlock(blockKey);
+        dirtyPlacedRemove.add(blockKey);
+        dirtyPlacedAdd.remove(blockKey);
+        schedulePlacedFlush();
         return true;
     }
 
@@ -273,6 +320,10 @@ public final class CompetitionService {
             return;
         }
         naturalEntities.add(entity.getUniqueId());
+    }
+
+    public void unmarkNaturalEntity(Entity entity) {
+        naturalEntities.remove(entity.getUniqueId());
     }
 
     public boolean isNaturalEntity(Entity entity) {
@@ -294,6 +345,10 @@ public final class CompetitionService {
         return fishingMaterials.contains(material);
     }
 
+    public boolean isFarmingMaterial(Material material) {
+        return farmingMaterials.contains(material);
+    }
+
     public boolean isSlayerMob(EntityType entityType) {
         return slayerMobs.contains(entityType);
     }
@@ -302,7 +357,8 @@ public final class CompetitionService {
         if (worldName == null || worldName.isBlank()) {
             return false;
         }
-        return excludedWorlds.contains(worldName.toLowerCase(Locale.ROOT));
+        return worldExclusionCache.computeIfAbsent(worldName,
+            k -> excludedWorlds.contains(k.toLowerCase(Locale.ROOT)));
     }
 
     public void addPoints(Player player, int amount) {
@@ -313,14 +369,15 @@ public final class CompetitionService {
             return;
         }
         UUID uuid = player.getUniqueId();
-        names.put(uuid, player.getName());
+        names.putIfAbsent(uuid, player.getName());
 
-        List<UUID> before = rankOrdered();
+        refreshRankSnapshotIfNeeded();
+        pendingOutrankBefore.computeIfAbsent(uuid, k -> List.copyOf(rankSnapshot));
         int updated = scores.getOrDefault(uuid, 0) + amount;
         scores.put(uuid, updated);
-        sqliteManager.upsertPlayerScore(activeChallenge, uuid, player.getName(), updated);
-
-        notifyOutranks(uuid, before, rankOrdered());
+        markRankingDirty();
+        scheduleDirtyFlush(uuid, player.getName(), updated);
+        scheduleOutrankFlush();
     }
 
     public boolean handlePointEdit(CommandSender sender, String[] args, String label, VCompetitionPlugin.PointOperation operation) {
@@ -350,7 +407,8 @@ public final class CompetitionService {
         }
         String targetName = target.getName() == null ? args[2] : target.getName();
 
-        List<UUID> before = rankOrdered();
+        refreshRankSnapshotIfNeeded();
+        List<UUID> before = List.copyOf(rankSnapshot);
         int base = scores.getOrDefault(uuid, 0);
         int safePoints = Math.max(0, points);
         int updated = switch (operation) {
@@ -361,8 +419,11 @@ public final class CompetitionService {
 
         scores.put(uuid, updated);
         names.put(uuid, targetName);
-        sqliteManager.upsertPlayerScore(activeChallenge, uuid, targetName, updated);
-        notifyOutranks(uuid, before, rankOrdered());
+    markRankingDirty();
+    refreshRankSnapshotNow();
+        scheduleDirtyFlush(uuid, targetName, updated);
+    List<UUID> after = List.copyOf(rankSnapshot);
+        notifyOutranks(uuid, before, after);
 
         plugin.getMessageService().sendPath(sender, "messages.point-edit.updated", List.of("&aPuntaje actualizado: &e%player% &7-> &b%points%"),
             plugin.getMessageService().placeholders("%player%", targetName, "%points%", String.valueOf(updated)));
@@ -374,10 +435,9 @@ public final class CompetitionService {
         startChallenge(type, true);
     }
 
-    public void startAdminChallengeUntilScheduleEnd(ChallengeType type) {
+    public void startAdminChallengeUntilScheduleEnd(ChallengeType type, long forcedEndMillis) {
         scheduleManagedChallenge = true;
-        Long forcedEnd = calculateNextScheduledEndMillis();
-        startChallenge(type, true, forcedEnd);
+        startChallenge(type, true, forcedEndMillis);
     }
 
     public void stopAdminChallenge() {
@@ -390,9 +450,9 @@ public final class CompetitionService {
         stopChallenge(false);
     }
 
-    public void startScheduledChallenge(ChallengeType type) {
+    public void startScheduledChallenge(ChallengeType type, long slotEndMillis) {
         scheduleManagedChallenge = true;
-        startChallenge(type, true, calculateNextScheduledEndMillis());
+        startChallenge(type, true, slotEndMillis);
     }
 
     public void stopScheduledChallenge() {
@@ -425,18 +485,24 @@ public final class CompetitionService {
         }
     }
 
-    public void updateDurationDays(long days) {
-        plugin.getConfig().set("challenge.duration-days", days);
+    public void updateDurationMinutes(long minutes) {
+        plugin.getConfig().set("challenge.duration-minutes", minutes);
         plugin.saveConfig();
 
         if (activeChallenge != null) {
-            challengeEnd = challengeStart + (days * 24L * 60L * 60L * 1000L);
+            challengeEnd = challengeStart + (minutes * 60L * 1000L);
             scheduleChallengeEnd();
             sqliteManager.saveChallengeState(activeChallenge, challengeStart, challengeEnd, true);
         }
     }
 
     public void resetPlacedCache() {
+        if (placedFlushTask != null) {
+            placedFlushTask.cancel();
+            placedFlushTask = null;
+        }
+        dirtyPlacedAdd.clear();
+        dirtyPlacedRemove.clear();
         placedBlocks.clear();
         sqliteManager.clearPlacedBlocks();
     }
@@ -459,21 +525,20 @@ public final class CompetitionService {
         miningMaterials = loadMaterials("competition-types.mining.materials");
         woodcuttingMaterials = loadMaterials("competition-types.woodcutting.materials");
         fishingMaterials = loadMaterials("competition-types.fishing.materials");
+        farmingMaterials = loadMaterials("competition-types.farming.materials");
         slayerMobs = loadEntityTypes("competition-types.slayer.mobs");
-        long intervalSeconds = Math.max(10L, plugin.getConfig().getLong("competition-types.playtime.interval-seconds", 60L));
-        playtimeIntervalTicks = intervalSeconds * 20L;
-        playtimePointsPerInterval = Math.max(1, plugin.getConfig().getInt("competition-types.playtime.points-per-interval", 1));
         excludedWorlds = plugin.getConfig().getStringList("excluded-worlds").stream()
             .map(value -> value == null ? "" : value.trim().toLowerCase(Locale.ROOT))
             .filter(value -> !value.isBlank())
             .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        worldExclusionCache.clear();
         outrankGlobalCooldownMillis = Math.max(0L, plugin.getConfig().getLong("notifications.outrank.global-cooldown-ms", 15000L));
         outrankServerGlobalCooldownMillis = Math.max(0L, plugin.getConfig().getLong("notifications.outrank.global-server-cooldown-ms", 8000L));
         outrankPrivateCooldownMillis = Math.max(0L, plugin.getConfig().getLong("notifications.outrank.private-cooldown-ms", 30000L));
         outrankSummaryThreshold = Math.max(1, plugin.getConfig().getInt("notifications.outrank.summary-threshold", 3));
         outrankMaxPrivateVictimsPerEvent = Math.max(0, plugin.getConfig().getInt("notifications.outrank.max-private-victims-per-event", 2));
         outrankGlobalTopCutoff = Math.max(1, plugin.getConfig().getInt("notifications.outrank.global-top-cutoff", 3));
-        startPlaytimeTickerIfNeeded();
+        rankingRefreshIntervalMillis = Math.max(50L, plugin.getConfig().getLong("performance.ranking-refresh-ms", 200L));
     }
 
     private Set<Material> loadMaterials(String path) {
@@ -512,7 +577,7 @@ public final class CompetitionService {
 
         activeChallenge = challengeType;
         challengeStart = System.currentTimeMillis();
-        long defaultEnd = challengeStart + (plugin.getConfig().getLong("challenge.duration-days", 7L) * 24L * 60L * 60L * 1000L);
+        long defaultEnd = challengeStart + (plugin.getConfig().getLong("challenge.duration-minutes", 30L) * 60L * 1000L);
         challengeEnd = (forcedEndMillis != null && forcedEndMillis > challengeStart) ? forcedEndMillis : defaultEnd;
 
         scores.clear();
@@ -520,8 +585,10 @@ public final class CompetitionService {
         sqliteManager.clearProgress(challengeType);
         sqliteManager.saveChallengeState(challengeType, challengeStart, challengeEnd, true);
 
+        rankSnapshot = List.of();
+        markRankingDirty();
+
         scheduleChallengeEnd();
-        startPlaytimeTickerIfNeeded();
 
         if (announce) {
             plugin.getMessageService().broadcastPath("messages.challenge-start", List.of("<green>Inició %challenge%</green>"),
@@ -556,11 +623,28 @@ public final class CompetitionService {
             applyRewardsAndAnnounceWinners(ending, ranking);
         }
 
+        if (flushTask != null) {
+            flushTask.cancel();
+            flushTask = null;
+        }
+        if (placedFlushTask != null) {
+            placedFlushTask.cancel();
+            placedFlushTask = null;
+        }
+        flushDirtyPlaced();
+        if (outrankTask != null) {
+            outrankTask.cancel();
+            outrankTask = null;
+        }
+        rankSnapshot = List.of();
+        rankingDirty = true;
         activeChallenge = null;
         challengeStart = 0L;
         challengeEnd = 0L;
         scheduleManagedChallenge = false;
-        stopPlaytimeTicker();
+        dirtyScores.clear();
+        pendingOutrankBefore.clear();
+        naturalEntities.clear();
         scores.clear();
         names.clear();
         lastOutrankGlobalByActor.clear();
@@ -568,56 +652,6 @@ public final class CompetitionService {
         lastOutrankGlobalServerAt = 0L;
 
         sqliteManager.saveChallengeState(null, 0L, 0L, false);
-    }
-
-    private Long calculateNextScheduledEndMillis() {
-        try {
-            ZoneId zoneId = ZoneId.of(plugin.getConfig().getString("schedule.timezone", "America/Santiago"));
-
-            DayOfWeek startDay = DayOfWeek.valueOf(plugin.getConfig().getString("schedule.start.day", "MONDAY").toUpperCase(Locale.ROOT));
-            int startHour = clamp(plugin.getConfig().getInt("schedule.start.hour", 18), 0, 23);
-            int startMinute = clamp(plugin.getConfig().getInt("schedule.start.minute", 0), 0, 59);
-
-            DayOfWeek endDay = DayOfWeek.valueOf(plugin.getConfig().getString("schedule.end.day", "SUNDAY").toUpperCase(Locale.ROOT));
-            int endHour = clamp(plugin.getConfig().getInt("schedule.end.hour", 22), 0, 23);
-            int endMinute = clamp(plugin.getConfig().getInt("schedule.end.minute", 0), 0, 59);
-
-            ZonedDateTime now = ZonedDateTime.now(zoneId);
-
-            LocalDate weekStartDate = now.toLocalDate();
-            while (weekStartDate.getDayOfWeek() != startDay) {
-                weekStartDate = weekStartDate.minusDays(1);
-            }
-
-            ZonedDateTime start = ZonedDateTime.of(LocalDateTime.of(weekStartDate, LocalTime.of(startHour, startMinute)), zoneId);
-
-            LocalDate weekEndDate = weekStartDate;
-            while (weekEndDate.getDayOfWeek() != endDay) {
-                weekEndDate = weekEndDate.plusDays(1);
-            }
-            ZonedDateTime end = ZonedDateTime.of(LocalDateTime.of(weekEndDate, LocalTime.of(endHour, endMinute)), zoneId);
-            if (!end.isAfter(start)) {
-                end = end.plusWeeks(1);
-            }
-
-            if (now.isBefore(start)) {
-                start = start.minusWeeks(1);
-                end = end.minusWeeks(1);
-            }
-
-            while (!end.isAfter(now)) {
-                end = end.plusWeeks(1);
-            }
-
-            return end.toInstant().toEpochMilli();
-        } catch (Exception exception) {
-            plugin.getLogger().warning("No se pudo calcular fin semanal programado, usando duración por defecto: " + exception.getMessage());
-            return null;
-        }
-    }
-
-    private int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
     }
 
     private void applyRewardsAndAnnounceWinners(ChallengeType challengeType, List<VCompetitionPlugin.RankingEntry> ranking) {
@@ -662,6 +696,68 @@ public final class CompetitionService {
         }
     }
 
+    private void scheduleOutrankFlush() {
+        if (outrankTask != null) {
+            return;
+        }
+        outrankTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            outrankTask = null;
+            if (pendingOutrankBefore.isEmpty()) return;
+            Map<UUID, List<UUID>> batch = new java.util.HashMap<>(pendingOutrankBefore);
+            pendingOutrankBefore.keySet().removeAll(batch.keySet());
+            refreshRankSnapshotNow();
+            List<UUID> after = List.copyOf(rankSnapshot);
+            for (Map.Entry<UUID, List<UUID>> entry : batch.entrySet()) {
+                notifyOutranks(entry.getKey(), entry.getValue(), after);
+            }
+        }, 2L);
+    }
+
+    private void scheduleDirtyFlush(UUID uuid, String name, int points) {
+        dirtyScores.put(uuid, points);
+        if (flushTask != null) {
+            return;
+        }
+        // Coalesce DB writes — flush after 4 ticks (~200ms) of inactivity
+        flushTask = Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, () -> {
+            flushTask = null;
+            flushDirtyScores();
+        }, 4L);
+    }
+
+    private void flushDirtyScores() {
+        if (activeChallenge == null || dirtyScores.isEmpty()) {
+            return;
+        }
+        ChallengeType challenge = activeChallenge;
+        Map<UUID, Integer> snapshot = new java.util.HashMap<>(dirtyScores);
+        dirtyScores.keySet().removeAll(snapshot.keySet());
+        sqliteManager.batchUpsertPlayerScores(challenge, snapshot, names);
+    }
+
+    private void schedulePlacedFlush() {
+        if (placedFlushTask != null) {
+            return;
+        }
+        placedFlushTask = Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, () -> {
+            placedFlushTask = null;
+            flushDirtyPlaced();
+        }, 4L);
+    }
+
+    private void flushDirtyPlaced() {
+        Set<BlockKey> toAdd = new java.util.HashSet<>(dirtyPlacedAdd);
+        dirtyPlacedAdd.removeAll(toAdd);
+        Set<BlockKey> toRemove = new java.util.HashSet<>(dirtyPlacedRemove);
+        dirtyPlacedRemove.removeAll(toRemove);
+        if (!toAdd.isEmpty()) {
+            sqliteManager.batchAddPlacedBlocks(toAdd);
+        }
+        if (!toRemove.isEmpty()) {
+            sqliteManager.batchRemovePlacedBlocks(toRemove);
+        }
+    }
+
     private void scheduleChallengeEnd() {
         if (endTask != null) {
             endTask.cancel();
@@ -671,75 +767,12 @@ public final class CompetitionService {
         endTask = Bukkit.getScheduler().runTaskLater(plugin, () -> stopChallenge(true), ticks);
     }
 
-    private void startPlaytimeTickerIfNeeded() {
-        if (!runtimeActive || activeChallenge != ChallengeType.PLAYTIME) {
-            stopPlaytimeTicker();
-            return;
-        }
-        if (playtimeTask != null && !playtimeTask.isCancelled()) {
-            return;
-        }
-
-        long interval = Math.max(20L, playtimeIntervalTicks);
-        playtimeTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (!runtimeActive || activeChallenge != ChallengeType.PLAYTIME) {
-                stopPlaytimeTicker();
-                return;
-            }
-            addPlaytimePointsBatch(playtimePointsPerInterval);
-        }, interval, interval);
-    }
-
-    private void addPlaytimePointsBatch(int amount) {
-        if (activeChallenge != ChallengeType.PLAYTIME || amount <= 0) {
-            return;
-        }
-
-        List<Player> onlinePlayers = new ArrayList<>();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.isOnline()) {
-                onlinePlayers.add(player);
-            }
-        }
-        if (onlinePlayers.isEmpty()) {
-            return;
-        }
-
-        List<UUID> before = rankOrdered();
-        for (Player player : onlinePlayers) {
-            if (isWorldExcluded(player.getWorld().getName())) {
-                continue;
-            }
-            UUID uuid = player.getUniqueId();
-            names.put(uuid, player.getName());
-            int updated = scores.getOrDefault(uuid, 0) + amount;
-            scores.put(uuid, updated);
-            sqliteManager.upsertPlayerScore(activeChallenge, uuid, player.getName(), updated);
-        }
-        List<UUID> after = rankOrdered();
-
-        for (Player player : onlinePlayers) {
-            if (isWorldExcluded(player.getWorld().getName())) {
-                continue;
-            }
-            notifyOutranks(player.getUniqueId(), before, after);
-        }
-    }
-
-    private void stopPlaytimeTicker() {
-        if (playtimeTask != null) {
-            playtimeTask.cancel();
-            playtimeTask = null;
-        }
-    }
-
     public List<VCompetitionPlugin.RankingEntry> getRankingEntries() {
+        refreshRankSnapshotIfNeeded();
         List<VCompetitionPlugin.RankingEntry> entries = new ArrayList<>();
-        for (Map.Entry<UUID, Integer> entry : scores.entrySet()) {
-            UUID uuid = entry.getKey();
-            entries.add(new VCompetitionPlugin.RankingEntry(uuid, names.getOrDefault(uuid, "Unknown"), entry.getValue()));
+        for (UUID uuid : rankSnapshot) {
+            entries.add(new VCompetitionPlugin.RankingEntry(uuid, names.getOrDefault(uuid, "Unknown"), scores.getOrDefault(uuid, 0)));
         }
-        entries.sort(Comparator.comparingInt(VCompetitionPlugin.RankingEntry::points).reversed().thenComparing(VCompetitionPlugin.RankingEntry::name));
         return entries;
     }
 

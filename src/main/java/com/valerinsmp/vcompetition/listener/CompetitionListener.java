@@ -14,6 +14,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.inventory.ItemStack;
 
@@ -45,7 +46,7 @@ public final class CompetitionListener implements Listener {
             return;
         }
         ChallengeType active = plugin.getActiveChallenge();
-        if (active != ChallengeType.MINING && active != ChallengeType.WOODCUTTING) {
+        if (active != ChallengeType.MINING && active != ChallengeType.WOODCUTTING && active != ChallengeType.FARMING) {
             return;
         }
 
@@ -61,6 +62,11 @@ public final class CompetitionListener implements Listener {
         }
 
         if (active == ChallengeType.WOODCUTTING && plugin.isWoodMaterial(broken)) {
+            plugin.addPoints(event.getPlayer(), 1);
+            return;
+        }
+
+        if (active == ChallengeType.FARMING && plugin.isFarmingMaterial(broken)) {
             plugin.addPoints(event.getPlayer(), 1);
         }
     }
@@ -135,6 +141,14 @@ public final class CompetitionListener implements Listener {
             return;
         }
         plugin.addPoints(killer, 1);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onEntityRemoveFromWorld(EntityRemoveFromWorldEvent event) {
+        if (!plugin.isRuntimeActive()) {
+            return;
+        }
+        plugin.unmarkNaturalEntity(event.getEntity());
     }
 
     private boolean isNaturalSpawnReason(CreatureSpawnEvent.SpawnReason reason) {
