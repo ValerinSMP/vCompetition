@@ -16,7 +16,7 @@ Bukkit/Paper plugin for weekly farming competitions on ValerinSMP. Spanish-langu
 
 - **`VCompetitionPlugin`** — entry point, bootstraps all services, proxy for competition state queries
 - **`CompetitionService`** — core logic: scoring, rankings, anti-exploit, tournament lifecycle
-- **`WeeklyScheduleService`** — cron-style auto start/stop (Monday 18:00 → Sunday 22:00, America/Santiago)
+- **`DailyScheduleService`** — slot-based scheduler; polls on a configurable tick interval, starts/stops challenges at configured daily time slots (`schedule.slots` in `config.yml`, default timezone `America/Santiago`)
 - **`SQLiteManager`** — single-threaded executor for all async DB ops; 7s drain on shutdown
 - **`VCompetitionPlaceholderExpansion`** — 27 PlaceholderAPI placeholders
 - **`FancyNpcSkinRefreshService`** — optional FancyNpcs soft-depend for top-3 NPC skins
@@ -24,7 +24,14 @@ Bukkit/Paper plugin for weekly farming competitions on ValerinSMP. Spanish-langu
 
 ## Challenge Types
 
-`ChallengeType` enum: `MINING`, `WOODCUTTING`, `FISHING`, `SLAYER`, `PLAYTIME`.
+`ChallengeType` enum: `MINING`, `WOODCUTTING`, `FISHING`, `SLAYER`, `FARMING`.
+
+Event → challenge mapping in `CompetitionListener`:
+
+- `BlockBreakEvent` → MINING, WOODCUTTING, FARMING (checks material sets; skips player-placed blocks)
+- `PlayerFishEvent` (CAUGHT_FISH, open-water only) → FISHING (points = item stack amount)
+- `EntityDeathEvent` → SLAYER (natural-entity check; killer must be a player)
+- `CreatureSpawnEvent` → marks natural entities; `EntityRemoveFromWorldEvent` → cleans them up
 
 ## Anti-Exploit
 

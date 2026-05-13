@@ -52,6 +52,8 @@ public final class SQLiteManager {
         try (Statement statement = connection.createStatement()) {
             statement.execute("PRAGMA journal_mode=WAL;");
             statement.execute("PRAGMA synchronous=NORMAL;");
+
+            // Legacy single-row table — kept for migration only
             statement.execute("CREATE TABLE IF NOT EXISTS challenge_state ("
                     + "id INTEGER PRIMARY KEY CHECK (id = 1),"
                     + "challenge_type TEXT,"
@@ -60,6 +62,21 @@ public final class SQLiteManager {
                     + "active INTEGER NOT NULL DEFAULT 0"
                     + ")");
 
+            // Multi-slot challenge state (one row per slot: 'daily', 'special', …)
+            statement.execute("CREATE TABLE IF NOT EXISTS challenge_state_v2 ("
+                    + "slot_id TEXT PRIMARY KEY,"
+                    + "challenge_type TEXT,"
+                    + "start_time INTEGER NOT NULL DEFAULT 0,"
+                    + "end_time INTEGER NOT NULL DEFAULT 0,"
+                    + "active INTEGER NOT NULL DEFAULT 0"
+                    + ")");
+
+            // Migrate legacy row to slot 'daily'
+            statement.execute("INSERT OR IGNORE INTO challenge_state_v2 (slot_id, challenge_type, start_time, end_time, active) "
+                    + "SELECT 'daily', challenge_type, start_time, end_time, active "
+                    + "FROM challenge_state WHERE id = 1");
+
+            // Legacy progress table — kept for migration only
             statement.execute("CREATE TABLE IF NOT EXISTS player_progress ("
                     + "challenge_type TEXT NOT NULL,"
                     + "player_uuid TEXT NOT NULL,"
@@ -67,6 +84,20 @@ public final class SQLiteManager {
                     + "points INTEGER NOT NULL DEFAULT 0,"
                     + "PRIMARY KEY (challenge_type, player_uuid)"
                     + ")");
+
+            // Multi-slot progress (slot_id distinguishes daily vs special)
+            statement.execute("CREATE TABLE IF NOT EXISTS player_progress_v2 ("
+                    + "slot_id TEXT NOT NULL,"
+                    + "challenge_type TEXT NOT NULL,"
+                    + "player_uuid TEXT NOT NULL,"
+                    + "player_name TEXT NOT NULL,"
+                    + "points INTEGER NOT NULL DEFAULT 0,"
+                    + "PRIMARY KEY (slot_id, challenge_type, player_uuid)"
+                    + ")");
+
+            // Migrate legacy progress rows to slot 'daily'
+            statement.execute("INSERT OR IGNORE INTO player_progress_v2 (slot_id, challenge_type, player_uuid, player_name, points) "
+                    + "SELECT 'daily', challenge_type, player_uuid, player_name, points FROM player_progress");
 
             statement.execute("CREATE TABLE IF NOT EXISTS placed_blocks ("
                     + "world TEXT NOT NULL,"
@@ -101,51 +132,62 @@ public final class SQLiteManager {
         }
     }
 
-    public CompletableFuture<Void> saveChallengeState(ChallengeType challengeType, long startTime, long endTime, boolean active) {
+    // ── Challenge state ──────────────────────────────────────────────────────
+
+    public CompletableFuture<Void> saveChallengeState(String slotId, ChallengeType challengeType,
+                                                       long startTime, long endTime, boolean active) {
         CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
-            String sql = "INSERT INTO challenge_state (id, challenge_type, start_time, end_time, active) VALUES (1, ?, ?, ?, ?) "
-                    + "ON CONFLICT(id) DO UPDATE SET challenge_type = excluded.challenge_type, start_time = excluded.start_time, "
-                    + "end_time = excluded.end_time, active = excluded.active";
+            String sql = "INSERT INTO challenge_state_v2 (slot_id, challenge_type, start_time, end_time, active) "
+                    + "VALUES (?, ?, ?, ?, ?) "
+                    + "ON CONFLICT(slot_id) DO UPDATE SET challenge_type = excluded.challenge_type, "
+                    + "start_time = excluded.start_time, end_time = excluded.end_time, active = excluded.active";
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, challengeType == null ? null : challengeType.name());
-                statement.setLong(2, startTime);
-                statement.setLong(3, endTime);
-                statement.setInt(4, active ? 1 : 0);
+                statement.setString(1, slotId);
+                statement.setString(2, challengeType == null ? null : challengeType.name());
+                statement.setLong(3, startTime);
+                statement.setLong(4, endTime);
+                statement.setInt(5, active ? 1 : 0);
                 statement.executeUpdate();
             } catch (SQLException exception) {
-                throw new RuntimeException("No se pudo guardar challenge_state", exception);
+                throw new RuntimeException("No se pudo guardar challenge_state_v2", exception);
             }
         }, executor);
         return track(task);
     }
 
-    public CompletableFuture<ChallengeStateSnapshot> loadChallengeState() {
+    public CompletableFuture<ChallengeStateSnapshot> loadChallengeState(String slotId) {
         CompletableFuture<ChallengeStateSnapshot> task = CompletableFuture.supplyAsync(() -> {
-            try (Statement statement = connection.createStatement();
-                 ResultSet resultSet = statement.executeQuery("SELECT challenge_type, start_time, end_time, active FROM challenge_state WHERE id = 1")) {
-                if (!resultSet.next()) {
-                    return new ChallengeStateSnapshot(null, 0L, 0L, false);
+            String sql = "SELECT challenge_type, start_time, end_time, active FROM challenge_state_v2 WHERE slot_id = ?";
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, slotId);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    if (!resultSet.next()) {
+                        return new ChallengeStateSnapshot(null, 0L, 0L, false);
+                    }
+                    String challengeName = resultSet.getString("challenge_type");
+                    ChallengeType challengeType = challengeName == null ? null : ChallengeType.valueOf(challengeName);
+                    return new ChallengeStateSnapshot(
+                            challengeType,
+                            resultSet.getLong("start_time"),
+                            resultSet.getLong("end_time"),
+                            resultSet.getInt("active") == 1
+                    );
                 }
-                String challengeName = resultSet.getString("challenge_type");
-                ChallengeType challengeType = challengeName == null ? null : ChallengeType.valueOf(challengeName);
-                return new ChallengeStateSnapshot(
-                        challengeType,
-                        resultSet.getLong("start_time"),
-                        resultSet.getLong("end_time"),
-                        resultSet.getInt("active") == 1
-                );
             } catch (SQLException exception) {
-                throw new RuntimeException("No se pudo cargar challenge_state", exception);
+                throw new RuntimeException("No se pudo cargar challenge_state_v2 para slot " + slotId, exception);
             }
         }, executor);
         return track(task);
     }
 
-    public CompletableFuture<Void> clearProgress(ChallengeType challengeType) {
+    // ── Player progress ──────────────────────────────────────────────────────
+
+    public CompletableFuture<Void> clearProgress(String slotId, ChallengeType challengeType) {
         CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
-            String sql = "DELETE FROM player_progress WHERE challenge_type = ?";
+            String sql = "DELETE FROM player_progress_v2 WHERE slot_id = ? AND challenge_type = ?";
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, challengeType.name());
+                statement.setString(1, slotId);
+                statement.setString(2, challengeType.name());
                 statement.executeUpdate();
             } catch (SQLException exception) {
                 throw new RuntimeException("No se pudo limpiar progreso", exception);
@@ -154,12 +196,13 @@ public final class SQLiteManager {
         return track(task);
     }
 
-    public CompletableFuture<Map<UUID, PlayerScore>> loadProgress(ChallengeType challengeType) {
+    public CompletableFuture<Map<UUID, PlayerScore>> loadProgress(String slotId, ChallengeType challengeType) {
         CompletableFuture<Map<UUID, PlayerScore>> task = CompletableFuture.supplyAsync(() -> {
             Map<UUID, PlayerScore> data = new HashMap<>();
-            String sql = "SELECT player_uuid, player_name, points FROM player_progress WHERE challenge_type = ?";
+            String sql = "SELECT player_uuid, player_name, points FROM player_progress_v2 WHERE slot_id = ? AND challenge_type = ?";
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, challengeType.name());
+                statement.setString(1, slotId);
+                statement.setString(2, challengeType.name());
                 try (ResultSet resultSet = statement.executeQuery()) {
                     while (resultSet.next()) {
                         UUID uuid = UUID.fromString(resultSet.getString("player_uuid"));
@@ -176,22 +219,42 @@ public final class SQLiteManager {
         return track(task);
     }
 
-    public CompletableFuture<Void> upsertPlayerScore(ChallengeType challengeType, UUID playerUuid, String playerName, int points) {
+    public CompletableFuture<Void> batchUpsertPlayerScores(String slotId, ChallengeType challengeType,
+                                                            Map<UUID, Integer> scores, Map<UUID, String> names) {
+        if (scores.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        Map<UUID, Integer> snapshot = new java.util.HashMap<>(scores);
         CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
-            String sql = "INSERT INTO player_progress (challenge_type, player_uuid, player_name, points) VALUES (?, ?, ?, ?) "
-                    + "ON CONFLICT(challenge_type, player_uuid) DO UPDATE SET player_name = excluded.player_name, points = excluded.points";
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, challengeType.name());
-                statement.setString(2, playerUuid.toString());
-                statement.setString(3, playerName);
-                statement.setInt(4, points);
-                statement.executeUpdate();
+            String sql = "INSERT INTO player_progress_v2 (slot_id, challenge_type, player_uuid, player_name, points) "
+                    + "VALUES (?, ?, ?, ?, ?) "
+                    + "ON CONFLICT(slot_id, challenge_type, player_uuid) DO UPDATE SET player_name = excluded.player_name, points = excluded.points";
+            try {
+                connection.setAutoCommit(false);
+                try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                    for (Map.Entry<UUID, Integer> entry : snapshot.entrySet()) {
+                        UUID uuid = entry.getKey();
+                        statement.setString(1, slotId);
+                        statement.setString(2, challengeType.name());
+                        statement.setString(3, uuid.toString());
+                        statement.setString(4, names.getOrDefault(uuid, "Unknown"));
+                        statement.setInt(5, entry.getValue());
+                        statement.addBatch();
+                    }
+                    statement.executeBatch();
+                }
+                connection.commit();
             } catch (SQLException exception) {
-                throw new RuntimeException("No se pudo guardar score", exception);
+                try { connection.rollback(); } catch (SQLException ignored) {}
+                throw new RuntimeException("No se pudo guardar batch de scores", exception);
+            } finally {
+                try { connection.setAutoCommit(true); } catch (SQLException ignored) {}
             }
         }, executor);
         return track(task);
     }
+
+    // ── Placed blocks ────────────────────────────────────────────────────────
 
     public CompletableFuture<List<BlockKey>> loadPlacedBlocks() {
         CompletableFuture<List<BlockKey>> task = CompletableFuture.supplyAsync(() -> {
@@ -211,38 +274,6 @@ public final class SQLiteManager {
                 throw new RuntimeException("No se pudo cargar placed_blocks", exception);
             }
             return blocks;
-        }, executor);
-        return track(task);
-    }
-
-    public CompletableFuture<Void> addPlacedBlock(BlockKey blockKey) {
-        CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
-            String sql = "INSERT OR IGNORE INTO placed_blocks(world, x, y, z) VALUES (?, ?, ?, ?)";
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, blockKey.world());
-                statement.setInt(2, blockKey.x());
-                statement.setInt(3, blockKey.y());
-                statement.setInt(4, blockKey.z());
-                statement.executeUpdate();
-            } catch (SQLException exception) {
-                throw new RuntimeException("No se pudo agregar placed_block", exception);
-            }
-        }, executor);
-        return track(task);
-    }
-
-    public CompletableFuture<Void> removePlacedBlock(BlockKey blockKey) {
-        CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
-            String sql = "DELETE FROM placed_blocks WHERE world = ? AND x = ? AND y = ? AND z = ?";
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, blockKey.world());
-                statement.setInt(2, blockKey.x());
-                statement.setInt(3, blockKey.y());
-                statement.setInt(4, blockKey.z());
-                statement.executeUpdate();
-            } catch (SQLException exception) {
-                throw new RuntimeException("No se pudo eliminar placed_block", exception);
-            }
         }, executor);
         return track(task);
     }
@@ -318,39 +349,10 @@ public final class SQLiteManager {
         return track(task);
     }
 
-    public CompletableFuture<Void> batchUpsertPlayerScores(ChallengeType challengeType, Map<UUID, Integer> scores, Map<UUID, String> names) {
-        if (scores.isEmpty()) {
-            return CompletableFuture.completedFuture(null);
-        }
-        Map<UUID, Integer> snapshot = new java.util.HashMap<>(scores);
-        CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
-            String sql = "INSERT INTO player_progress (challenge_type, player_uuid, player_name, points) VALUES (?, ?, ?, ?) "
-                    + "ON CONFLICT(challenge_type, player_uuid) DO UPDATE SET player_name = excluded.player_name, points = excluded.points";
-            try {
-                connection.setAutoCommit(false);
-                try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                    for (Map.Entry<UUID, Integer> entry : snapshot.entrySet()) {
-                        UUID uuid = entry.getKey();
-                        statement.setString(1, challengeType.name());
-                        statement.setString(2, uuid.toString());
-                        statement.setString(3, names.getOrDefault(uuid, "Unknown"));
-                        statement.setInt(4, entry.getValue());
-                        statement.addBatch();
-                    }
-                    statement.executeBatch();
-                }
-                connection.commit();
-            } catch (SQLException exception) {
-                try { connection.rollback(); } catch (SQLException ignored) {}
-                throw new RuntimeException("No se pudo guardar batch de scores", exception);
-            } finally {
-                try { connection.setAutoCommit(true); } catch (SQLException ignored) {}
-            }
-        }, executor);
-        return track(task);
-    }
+    // ── Winners & win history ────────────────────────────────────────────────
 
-    public CompletableFuture<Void> recordWinner(ChallengeType challengeType, UUID playerUuid, String playerName, int points, long endedAt) {
+    public CompletableFuture<Void> recordWinner(ChallengeType challengeType, UUID playerUuid,
+                                                 String playerName, int points, long endedAt) {
         CompletableFuture<Void> task = CompletableFuture.runAsync(() -> {
             try {
                 connection.setAutoCommit(false);
@@ -384,16 +386,10 @@ public final class SQLiteManager {
 
                 connection.commit();
             } catch (SQLException exception) {
-                try {
-                    connection.rollback();
-                } catch (SQLException ignored) {
-                }
+                try { connection.rollback(); } catch (SQLException ignored) {}
                 throw new RuntimeException("No se pudo registrar ganador", exception);
             } finally {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException ignored) {
-                }
+                try { connection.setAutoCommit(true); } catch (SQLException ignored) {}
             }
         }, executor);
         return track(task);
@@ -436,6 +432,8 @@ public final class SQLiteManager {
         }, executor);
         return track(task);
     }
+
+    // ── Connection / lifecycle ───────────────────────────────────────────────
 
     public boolean isConnected() {
         try {
@@ -499,12 +497,11 @@ public final class SQLiteManager {
         return future;
     }
 
-    public record ChallengeStateSnapshot(ChallengeType challengeType, long startTime, long endTime, boolean active) {
-    }
+    // ── Records ──────────────────────────────────────────────────────────────
 
-    public record PlayerScore(String playerName, int points) {
-    }
+    public record ChallengeStateSnapshot(ChallengeType challengeType, long startTime, long endTime, boolean active) {}
 
-    public record PlayerWins(String playerName, int wins) {
-    }
+    public record PlayerScore(String playerName, int points) {}
+
+    public record PlayerWins(String playerName, int wins) {}
 }

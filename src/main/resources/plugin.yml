@@ -10,7 +10,7 @@ commands:
   vcompetition:
     aliases: [competition, torneos]
     description: Comando principal de vCompetition
-    usage: /vcompetition admin <start|startuntilsunday|stop|stopnorewards|edit|debug|reload|status|top|addpoints|removepoints|setduration|resetplaced|refreshskins>
+    usage: /vcompetition admin <start|stop|startspecial|stopspecial|...>
 
 permissions:
   vcompetition.admin:
@@ -26,9 +26,17 @@ permissions:
       vcompetition.admin.startuntilsunday: true
       vcompetition.admin.stop: true
       vcompetition.admin.stopnorewards: true
+      vcompetition.admin.startspecial: true
+      vcompetition.admin.startspecialuntilend: true
+      vcompetition.admin.stopspecial: true
+      vcompetition.admin.stopspecialnorewards: true
+      vcompetition.admin.topspecial: true
       vcompetition.admin.edit: true
       vcompetition.admin.addpoints: true
       vcompetition.admin.removepoints: true
+      vcompetition.admin.editspecial: true
+      vcompetition.admin.addpointsspecial: true
+      vcompetition.admin.removepointsspecial: true
       vcompetition.admin.reload: true
       vcompetition.admin.status: true
       vcompetition.admin.top: true
@@ -43,10 +51,34 @@ permissions:
     description: Iniciar reto hasta el cierre semanal configurado
     default: op
   vcompetition.admin.stop:
-    description: Finalizar reto manualmente
+    description: Finalizar reto diario manualmente
     default: op
   vcompetition.admin.stopnorewards:
-    description: Detener reto sin recompensas ni anuncio global
+    description: Detener reto diario sin recompensas
+    default: op
+  vcompetition.admin.startspecial:
+    description: Iniciar evento especial manualmente
+    default: op
+  vcompetition.admin.startspecialuntilend:
+    description: Iniciar evento especial hasta el cierre del slot configurado
+    default: op
+  vcompetition.admin.stopspecial:
+    description: Finalizar evento especial manualmente
+    default: op
+  vcompetition.admin.stopspecialnorewards:
+    description: Detener evento especial sin recompensas
+    default: op
+  vcompetition.admin.topspecial:
+    description: Ver top del evento especial
+    default: op
+  vcompetition.admin.editspecial:
+    description: Editar puntaje absoluto en evento especial
+    default: op
+  vcompetition.admin.addpointsspecial:
+    description: Agregar puntos en evento especial
+    default: op
+  vcompetition.admin.removepointsspecial:
+    description: Quitar puntos en evento especial
     default: op
   vcompetition.admin.edit:
     description: Editar puntaje absoluto

@@ -8,7 +8,8 @@ public enum ChallengeType {
     WOODCUTTING,
     FISHING,
     SLAYER,
-    FARMING;
+    FARMING,
+    OTONO;
 
     public static ChallengeType fromInput(String input) {
         return ChallengeType.valueOf(input.toUpperCase(Locale.ROOT));
@@ -21,10 +22,11 @@ public enum ChallengeType {
             case FISHING -> "ᴘᴇꜱᴄᴀ";
             case SLAYER -> "ᴄᴀᴢᴀ";
             case FARMING -> "ꜰᴀʀᴍᴇᴏ";
+            case OTONO -> "ᴏᴛᴏɴ̃ᴏ";
         };
     }
 
-    /** Challenge types eligible for random selection. PLAYTIME is excluded. */
+    /** Challenge types eligible for random selection in the daily schedule. OTONO is excluded (special event only). */
     public static List<ChallengeType> randomPool() {
         return List.of(MINING, WOODCUTTING, FISHING, SLAYER, FARMING);
     }

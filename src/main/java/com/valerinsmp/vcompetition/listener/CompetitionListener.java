@@ -3,8 +3,6 @@ package com.valerinsmp.vcompetition.listener;
 import com.valerinsmp.vcompetition.VCompetitionPlugin;
 import com.valerinsmp.vcompetition.model.BlockKey;
 import com.valerinsmp.vcompetition.model.ChallengeType;
-import org.bukkit.Material;
-import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -27,86 +25,40 @@ public final class CompetitionListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
-        if (!plugin.isRuntimeActive()) {
-            return;
-        }
-        if (plugin.isWorldExcluded(event.getBlockPlaced().getWorld().getName())) {
-            return;
-        }
-        BlockKey blockKey = BlockKey.fromLocation(event.getBlockPlaced().getLocation());
-        plugin.registerPlacedBlock(blockKey);
+        if (!plugin.isRuntimeActive()) return;
+        if (plugin.isWorldExcluded(event.getBlockPlaced().getWorld().getName())) return;
+        plugin.registerPlacedBlock(BlockKey.fromLocation(event.getBlockPlaced().getLocation()));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        if (!plugin.isRuntimeActive()) {
-            return;
-        }
-        if (plugin.isWorldExcluded(event.getBlock().getWorld().getName())) {
-            return;
-        }
-        ChallengeType active = plugin.getActiveChallenge();
-        if (active != ChallengeType.MINING && active != ChallengeType.WOODCUTTING && active != ChallengeType.FARMING) {
-            return;
-        }
+        if (!plugin.isRuntimeActive()) return;
+        if (plugin.isWorldExcluded(event.getBlock().getWorld().getName())) return;
+        if (!plugin.hasAnyBlockChallenge()) return;
 
-        BlockKey blockKey = BlockKey.fromLocation(event.getBlock().getLocation());
-        if (plugin.consumeIfPlacedByPlayer(blockKey)) {
-            return;
-        }
+        BlockKey key = BlockKey.fromLocation(event.getBlock().getLocation());
+        if (plugin.consumeIfPlacedByPlayer(key)) return;
 
-        Material broken = event.getBlock().getType();
-        if (active == ChallengeType.MINING && plugin.isMiningMaterial(broken)) {
-            plugin.addPoints(event.getPlayer(), 1);
-            return;
-        }
-
-        if (active == ChallengeType.WOODCUTTING && plugin.isWoodMaterial(broken)) {
-            plugin.addPoints(event.getPlayer(), 1);
-            return;
-        }
-
-        if (active == ChallengeType.FARMING && plugin.isFarmingMaterial(broken)) {
-            plugin.addPoints(event.getPlayer(), 1);
-        }
+        plugin.handleBlockBreak(event.getPlayer(), event.getBlock().getType());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onFish(PlayerFishEvent event) {
-        if (!plugin.isRuntimeActive()) {
-            return;
-        }
-        if (plugin.isWorldExcluded(event.getPlayer().getWorld().getName())) {
-            return;
-        }
-        if (plugin.getActiveChallenge() != ChallengeType.FISHING) {
-            return;
-        }
-        if (event.getState() != PlayerFishEvent.State.CAUGHT_FISH) {
-            return;
-        }
-        if (!(event.getCaught() instanceof Item item)) {
-            return;
-        }
-        ItemStack stack = item.getItemStack();
-        if (!plugin.isFishingMaterial(stack.getType())) {
-            return;
-        }
+        if (!plugin.isRuntimeActive()) return;
+        if (plugin.isWorldExcluded(event.getPlayer().getWorld().getName())) return;
+        if (!plugin.hasAnyChallengeOfType(ChallengeType.FISHING)) return;
+        if (event.getState() != PlayerFishEvent.State.CAUGHT_FISH) return;
+        if (!(event.getCaught() instanceof Item item)) return;
+        if (event.getHook() != null && !event.getHook().isInOpenWater()) return;
 
-        if (event.getHook() != null && !event.getHook().isInOpenWater()) {
-            return;
-        }
-        plugin.addPoints(event.getPlayer(), stack.getAmount());
+        ItemStack stack = item.getItemStack();
+        plugin.handleFishCatch(event.getPlayer(), stack.getType(), stack.getAmount());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onCreatureSpawn(CreatureSpawnEvent event) {
-        if (!plugin.isRuntimeActive()) {
-            return;
-        }
-        if (plugin.isWorldExcluded(event.getLocation().getWorld().getName())) {
-            return;
-        }
+        if (!plugin.isRuntimeActive()) return;
+        if (plugin.isWorldExcluded(event.getLocation().getWorld().getName())) return;
         if (isNaturalSpawnReason(event.getSpawnReason())) {
             plugin.markNaturalEntity(event.getEntity());
         }
@@ -114,40 +66,21 @@ public final class CompetitionListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEntityDeath(EntityDeathEvent event) {
-        if (!plugin.isRuntimeActive()) {
-            return;
-        }
-        if (plugin.isWorldExcluded(event.getEntity().getWorld().getName())) {
-            return;
-        }
-        if (plugin.getActiveChallenge() != ChallengeType.SLAYER) {
-            return;
-        }
+        if (!plugin.isRuntimeActive()) return;
+        if (plugin.isWorldExcluded(event.getEntity().getWorld().getName())) return;
+        if (!plugin.hasAnyChallengeOfType(ChallengeType.SLAYER)) return;
 
         Player killer = event.getEntity().getKiller();
-        if (killer == null) {
-            return;
-        }
-        if (plugin.isWorldExcluded(killer.getWorld().getName())) {
-            return;
-        }
+        if (killer == null) return;
+        if (plugin.isWorldExcluded(killer.getWorld().getName())) return;
+        if (!plugin.isNaturalEntity(event.getEntity())) return;
 
-        EntityType entityType = event.getEntityType();
-        if (!plugin.isSlayerMob(entityType)) {
-            return;
-        }
-
-        if (!plugin.isNaturalEntity(event.getEntity())) {
-            return;
-        }
-        plugin.addPoints(killer, 1);
+        plugin.handleEntityKill(killer, event.getEntityType());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onEntityRemoveFromWorld(EntityRemoveFromWorldEvent event) {
-        if (!plugin.isRuntimeActive()) {
-            return;
-        }
+        if (!plugin.isRuntimeActive()) return;
         plugin.unmarkNaturalEntity(event.getEntity());
     }
 
