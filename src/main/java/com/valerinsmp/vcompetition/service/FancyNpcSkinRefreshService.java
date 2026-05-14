@@ -84,6 +84,9 @@ public final class FancyNpcSkinRefreshService {
         if (bridge == null) {
             return;
         }
+        if (!plugin.hasActiveChallenge() && !plugin.hasActiveSpecialChallenge()) {
+            return;
+        }
 
         RefreshMode mode = loadMode();
         boolean debug = isDebugEnabled();

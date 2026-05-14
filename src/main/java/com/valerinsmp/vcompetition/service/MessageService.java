@@ -52,24 +52,7 @@ public final class MessageService {
         if (safe.contains("&")) {
             return legacySerializer.deserialize(safe);
         }
-        if (containsMiniMessageTag(safe)) {
-            return miniMessage.deserialize(safe);
-        }
-        return Component.text(safe);
-    }
-
-    private boolean containsMiniMessageTag(String raw) {
-        return raw.contains("<red>")
-                || raw.contains("<green>")
-                || raw.contains("<yellow>")
-                || raw.contains("<gold>")
-                || raw.contains("<aqua>")
-                || raw.contains("<gray>")
-                || raw.contains("<dark_gray>")
-                || raw.contains("<white>")
-                || raw.contains("<reset>")
-                || raw.contains("<gradient:")
-                || raw.contains("</gradient>");
+        return miniMessage.deserialize(safe);
     }
 
     public String applyPlaceholders(String raw, String challenge, String player, String victim, int points, int rank, int wins) {

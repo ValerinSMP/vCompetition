@@ -1,10 +1,12 @@
 package com.valerinsmp.vcompetition;
 
 import com.valerinsmp.vcompetition.command.VCompetitionAdminCommand;
+import com.valerinsmp.vcompetition.command.VCompetitionCommand;
 import com.valerinsmp.vcompetition.listener.CompetitionListener;
 import com.valerinsmp.vcompetition.model.BlockKey;
 import com.valerinsmp.vcompetition.model.ChallengeType;
 import com.valerinsmp.vcompetition.placeholder.VCompetitionPlaceholderExpansion;
+import com.valerinsmp.vcompetition.service.BossBarService;
 import com.valerinsmp.vcompetition.service.CompetitionService;
 import com.valerinsmp.vcompetition.service.DailyScheduleService;
 import com.valerinsmp.vcompetition.service.FancyNpcSkinRefreshService;
@@ -32,6 +34,7 @@ public final class VCompetitionPlugin extends JavaPlugin {
     private DailyScheduleService dailyScheduleService;
     private DailyScheduleService specialEventScheduleService;
     private FancyNpcSkinRefreshService fancyNpcSkinRefreshService;
+    private BossBarService bossBarService;
     private VCompetitionPlaceholderExpansion placeholderExpansion;
 
     @Override
@@ -57,10 +60,17 @@ public final class VCompetitionPlugin extends JavaPlugin {
         competitionService.loadPersistentState();
 
         getServer().getPluginManager().registerEvents(new CompetitionListener(this), this);
-        VCompetitionAdminCommand adminCommand = new VCompetitionAdminCommand(this);
+
+        VCompetitionCommand userCommand = new VCompetitionCommand(this);
         if (getCommand("vcompetition") != null) {
-            getCommand("vcompetition").setExecutor(adminCommand);
-            getCommand("vcompetition").setTabCompleter(adminCommand);
+            getCommand("vcompetition").setExecutor(userCommand);
+            getCommand("vcompetition").setTabCompleter(userCommand);
+        }
+
+        VCompetitionAdminCommand adminCommand = new VCompetitionAdminCommand(this);
+        if (getCommand("vcompetitionadmin") != null) {
+            getCommand("vcompetitionadmin").setExecutor(adminCommand);
+            getCommand("vcompetitionadmin").setTabCompleter(adminCommand);
         }
 
         dailyScheduleService        = new DailyScheduleService(this, CompetitionService.SLOT_DAILY,   "schedule");
@@ -70,6 +80,10 @@ public final class VCompetitionPlugin extends JavaPlugin {
 
         fancyNpcSkinRefreshService = new FancyNpcSkinRefreshService(this);
         fancyNpcSkinRefreshService.start();
+
+        bossBarService = new BossBarService(this);
+        bossBarService.start();
+
         registerPlaceholders();
     }
 
@@ -90,6 +104,10 @@ public final class VCompetitionPlugin extends JavaPlugin {
         if (fancyNpcSkinRefreshService != null) {
             fancyNpcSkinRefreshService.stop();
             fancyNpcSkinRefreshService = null;
+        }
+        if (bossBarService != null) {
+            bossBarService.stop();
+            bossBarService = null;
         }
         if (competitionService != null) {
             competitionService.disableRuntime();
@@ -116,10 +134,17 @@ public final class VCompetitionPlugin extends JavaPlugin {
         if (dailyScheduleService != null) dailyScheduleService.start();
         if (specialEventScheduleService != null) specialEventScheduleService.start();
         if (fancyNpcSkinRefreshService != null) fancyNpcSkinRefreshService.start();
+        if (bossBarService != null) bossBarService.start();
     }
 
-    public MessageService getMessageService() { return messageService; }
-    public SoundService   getSoundService()   { return soundService;   }
+    public MessageService  getMessageService()  { return messageService;  }
+    public SoundService    getSoundService()    { return soundService;    }
+    public BossBarService  getBossBarService()  { return bossBarService;  }
+
+    // Slot-aware point/position proxies used by BossBarService
+    public int getPlayerPoints(String slotId, UUID uuid)   { return competitionService == null ? 0  : competitionService.getPlayerPoints(slotId, uuid); }
+    public int getPlayerPosition(String slotId, UUID uuid) { return competitionService == null ? -1 : competitionService.getPlayerPosition(slotId, uuid); }
+    public VCompetitionPlugin.RankingEntry getCurrentTopAt(String slotId, int rank) { return competitionService == null ? null : competitionService.getCurrentTopAt(slotId, rank); }
 
     // ── Slot-aware competition queries ────────────────────────────────────────
     public boolean hasActiveChallenge(String slotId) {
@@ -241,11 +266,8 @@ public final class VCompetitionPlugin extends JavaPlugin {
     public Component statusLine() {
         return competitionService == null ? renderPrefixed("&cNo hay reto activo.") : competitionService.statusLine();
     }
-    public void sendTop(CommandSender sender) {
-        if (competitionService != null) competitionService.sendTop(sender);
-    }
-    public void sendTopSpecial(CommandSender sender) {
-        if (competitionService != null) competitionService.sendTop(sender, CompetitionService.SLOT_SPECIAL);
+    public void sendUnifiedTop(CommandSender sender) {
+        if (competitionService != null) competitionService.sendUnifiedTop(sender);
     }
     public void sendDebug(CommandSender sender) {
         if (competitionService != null) competitionService.sendDebug(sender, placeholderExpansion != null);

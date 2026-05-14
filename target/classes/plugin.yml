@@ -8,13 +8,20 @@ softdepend: [PlaceholderAPI, FancyNpcs]
 
 commands:
   vcompetition:
-    aliases: [competition, torneos]
-    description: Comando principal de vCompetition
-    usage: /vcompetition admin <start|stop|startspecial|stopspecial|...>
+    aliases: [competition, torneos, torneo]
+    description: Comandos de torneos para jugadores
+    usage: /torneos [status|top|help]
+  vcompetitionadmin:
+    aliases: [torneoadmin]
+    description: Comandos de administración de torneos
+    usage: /torneoadmin <start|stop|startspecial|stopspecial|...>
 
 permissions:
+  vcompetition.use:
+    description: Usar comandos de torneos para jugadores
+    default: true
   vcompetition.admin:
-    description: Permiso legacy global de administración
+    description: Permiso global de administración de torneos
     default: op
     children:
       vcompetition.admin.*: true
@@ -27,10 +34,8 @@ permissions:
       vcompetition.admin.stop: true
       vcompetition.admin.stopnorewards: true
       vcompetition.admin.startspecial: true
-      vcompetition.admin.startspecialuntilend: true
       vcompetition.admin.stopspecial: true
       vcompetition.admin.stopspecialnorewards: true
-      vcompetition.admin.topspecial: true
       vcompetition.admin.edit: true
       vcompetition.admin.addpoints: true
       vcompetition.admin.removepoints: true
@@ -59,17 +64,11 @@ permissions:
   vcompetition.admin.startspecial:
     description: Iniciar evento especial manualmente
     default: op
-  vcompetition.admin.startspecialuntilend:
-    description: Iniciar evento especial hasta el cierre del slot configurado
-    default: op
   vcompetition.admin.stopspecial:
     description: Finalizar evento especial manualmente
     default: op
   vcompetition.admin.stopspecialnorewards:
     description: Detener evento especial sin recompensas
-    default: op
-  vcompetition.admin.topspecial:
-    description: Ver top del evento especial
     default: op
   vcompetition.admin.editspecial:
     description: Editar puntaje absoluto en evento especial

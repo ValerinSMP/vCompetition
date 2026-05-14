@@ -47,6 +47,13 @@ public final class SQLiteManager {
     }
 
     public void connect() throws SQLException {
+        // Explicit class load ensures the shaded driver is registered in the current
+        // classloader — required for PlugMan reload compatibility.
+        try {
+            Class.forName("com.valerinsmp.vcompetition.libs.sqlite.JDBC");
+        } catch (ClassNotFoundException exception) {
+            throw new SQLException("No se encontró el driver SQLite shadeado", exception);
+        }
         File dbFile = new File(plugin.getDataFolder(), "competition.db");
         connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
         try (Statement statement = connection.createStatement()) {
@@ -488,6 +495,20 @@ public final class SQLiteManager {
                 connection.close();
             } catch (SQLException ignored) {
             }
+        }
+
+        // Deregister any SQLite drivers loaded by this classloader so PlugMan can
+        // reload the plugin cleanly without ClassCastException on the next connect().
+        try {
+            java.util.Enumeration<java.sql.Driver> drivers = DriverManager.getDrivers();
+            ClassLoader ownLoader = getClass().getClassLoader();
+            while (drivers.hasMoreElements()) {
+                java.sql.Driver driver = drivers.nextElement();
+                if (driver.getClass().getClassLoader() == ownLoader) {
+                    DriverManager.deregisterDriver(driver);
+                }
+            }
+        } catch (SQLException ignored) {
         }
     }
 

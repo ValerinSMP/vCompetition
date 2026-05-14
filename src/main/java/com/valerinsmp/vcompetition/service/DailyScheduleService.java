@@ -153,11 +153,9 @@ public final class DailyScheduleService {
         pool.remove(previous);
         if (pool.isEmpty()) pool = new ArrayList<>(ChallengeType.randomPool());
         ChallengeType selected = pool.get(ThreadLocalRandom.current().nextInt(pool.size()));
-        final String selectedName = selected.name();
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-            plugin.getConfig().set(configPrefix + LAST_RANDOM_CHALLENGE_PATH_SUFFIX, selectedName);
-            plugin.saveConfig();
-        });
+        // getConfig().set() must run on the main thread; saveConfig() (disk I/O) goes async.
+        plugin.getConfig().set(configPrefix + LAST_RANDOM_CHALLENGE_PATH_SUFFIX, selected.name());
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, plugin::saveConfig);
         return selected;
     }
 

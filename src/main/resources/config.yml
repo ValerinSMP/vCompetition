@@ -16,6 +16,23 @@ notifications:
 performance:
   ranking-refresh-ms: 200
 
+# ── Bossbar de participantes ─────────────────────────────────────────────────
+# Aparece la primera vez que el jugador anota un punto en el torneo.
+# Colores válidos: PINK | BLUE | RED | GREEN | YELLOW | PURPLE | WHITE
+# Overlays válidos: PROGRESS | NOTCHED_6 | NOTCHED_10 | NOTCHED_12 | NOTCHED_20
+# Placeholders del título: <rank> <points> <top1_name> <top1_points>
+bossbar:
+  daily:
+    enabled: true
+    color: YELLOW
+    overlay: PROGRESS
+    title: "<gray>#<yellow><rank></yellow> <dark_gray>| <aqua><points> pts</aqua> <dark_gray>| <gray>Top1: <gold><top1_name></gold> <dark_gray>— <yellow><top1_points></yellow>"
+  special:
+    enabled: true
+    color: GREEN
+    overlay: PROGRESS
+    title: "<gray>#<yellow><rank></yellow> <dark_gray>| <aqua><points> pts</aqua> <dark_gray>| <gray>Top1: <gold><top1_name></gold> <dark_gray>— <yellow><top1_points></yellow>"
+
 # ── Torneo diario ────────────────────────────────────────────────────────────
 schedule:
   enabled: true
@@ -69,14 +86,27 @@ fancy-npcs:
 competition-types:
   mining:
     materials:
+      # Overworld ores
       - COAL_ORE
       - DEEPSLATE_COAL_ORE
+      - COPPER_ORE
+      - DEEPSLATE_COPPER_ORE
       - IRON_ORE
       - DEEPSLATE_IRON_ORE
       - GOLD_ORE
       - DEEPSLATE_GOLD_ORE
+      - LAPIS_ORE
+      - DEEPSLATE_LAPIS_ORE
+      - REDSTONE_ORE
+      - DEEPSLATE_REDSTONE_ORE
+      - EMERALD_ORE
+      - DEEPSLATE_EMERALD_ORE
       - DIAMOND_ORE
       - DEEPSLATE_DIAMOND_ORE
+      # Nether
+      - NETHER_QUARTZ_ORE
+      - NETHER_GOLD_ORE
+      - ANCIENT_DEBRIS
     # rewards: (opcional) Si se define aquí, tiene prioridad sobre rewards.top1/2/3
     # rewards:
     #   top1:
@@ -87,6 +117,7 @@ competition-types:
 
   woodcutting:
     materials:
+      # Overworld logs
       - OAK_LOG
       - SPRUCE_LOG
       - BIRCH_LOG
@@ -95,7 +126,9 @@ competition-types:
       - DARK_OAK_LOG
       - MANGROVE_LOG
       - CHERRY_LOG
-      - pale_oak_log
+      - PALE_OAK_LOG     # 1.21.2
+      - BAMBOO_BLOCK     # 1.20 - madera de bambú
+      # Nether
       - CRIMSON_STEM
       - WARPED_STEM
 
@@ -108,28 +141,64 @@ competition-types:
 
   slayer:
     mobs:
+      # Overworld comunes
       - ZOMBIE
-      - SKELETON
-      - CREEPER
-      - SPIDER
-      - ENDERMAN
-      - WITCH
+      - ZOMBIE_VILLAGER
       - HUSK
       - DROWNED
+      - SKELETON
       - STRAY
+      - BOGGED           # 1.21
+      - CREEPER
+      - SPIDER
+      - CAVE_SPIDER
+      - ENDERMAN
+      - WITCH
+      - PHANTOM
+      # Illagers
+      - PILLAGER
+      - VINDICATOR
+      - EVOKER
+      - VEX
+      - RAVAGER
+      # Nether
+      - ZOMBIFIED_PIGLIN
+      - PIGLIN
+      - PIGLIN_BRUTE
+      - HOGLIN
+      - ZOGLIN
+      - WITHER_SKELETON
+      - BLAZE
+      - GHAST
+      - MAGMA_CUBE
+      - BREEZE           # 1.21
+      # Otros
+      - GUARDIAN
+      - SLIME
+      - SILVERFISH
+      - WARDEN           # 1.19
+      - CREAKING         # 1.21.2
 
   farming:
     materials:
+      # Cultivos estándar
       - WHEAT
       - CARROTS
       - POTATOES
       - BEETROOTS
+      # Plantas
       - SUGAR_CANE
+      - BAMBOO           # 1.14
+      - KELP             # 1.13
       - MELON
       - PUMPKIN
       - NETHER_WART
       - COCOA
       - SWEET_BERRY_BUSH
+      - CAVE_VINES_PLANT # 1.17 - glow berries
+      # Sniffer (1.20)
+      - TORCHFLOWER
+      - PITCHER_PLANT
 
   # Evento otoñal: cosecha + follaje
   otono:
@@ -156,12 +225,15 @@ competition-types:
     # Recompensas propias del evento especial (sobreescriben rewards.top1/2/3)
     rewards:
       top1:
+        display: "1 Llave Otoño"
         commands:
           - "crate key give %player% otono 1"
       top2:
+        display: "1 Llave Otoño"
         commands:
           - "crate key give %player% otono 1"
       top3:
+        display: "1 Llave Otoño"
         commands:
           - "crate key give %player% otono 1"
       participant:
@@ -171,14 +243,17 @@ competition-types:
 # ── Recompensas globales (usadas si el tipo no define las suyas) ──────────────
 rewards:
   top1:
+    display: "10 Diamantes + $500"
     commands:
       - "give %player% diamond 10"
       - "eco add %player% 500"
   top2:
+    display: "6 Diamantes + $300"
     commands:
       - "give %player% diamond 6"
       - "eco add %player% 300"
   top3:
+    display: "3 Diamantes + $150"
     commands:
       - "give %player% diamond 3"
       - "eco add %player% 150"

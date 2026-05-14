@@ -4,8 +4,11 @@ com\valerinsmp\vcompetition\model\BlockKey.class
 com\valerinsmp\vcompetition\service\FancyNpcSkinRefreshService$NpcBridge.class
 com\valerinsmp\vcompetition\listener\CompetitionListener.class
 com\valerinsmp\vcompetition\model\ChallengeType.class
+com\valerinsmp\vcompetition\command\VCompetitionCommand.class
 com\valerinsmp\vcompetition\storage\SQLiteManager$PlayerScore.class
+com\valerinsmp\vcompetition\util\TimeUtil.class
 com\valerinsmp\vcompetition\service\CompetitionService.class
+com\valerinsmp\vcompetition\service\BossBarService.class
 com\valerinsmp\vcompetition\service\CompetitionService$ChallengeSlot.class
 com\valerinsmp\vcompetition\service\DailyScheduleService$Slot.class
 com\valerinsmp\vcompetition\storage\SQLiteManager$PlayerWins.class

@@ -14,6 +14,8 @@ import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 import org.bukkit.event.player.PlayerFishEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 
 public final class CompetitionListener implements Listener {
@@ -76,6 +78,20 @@ public final class CompetitionListener implements Listener {
         if (!plugin.isNaturalEntity(event.getEntity())) return;
 
         plugin.handleEntityKill(killer, event.getEntityType());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        if (plugin.getBossBarService() != null) {
+            plugin.getBossBarService().reattachOnJoin(event.getPlayer());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        if (plugin.getBossBarService() != null) {
+            plugin.getBossBarService().hidePlayerBars(event.getPlayer().getUniqueId());
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

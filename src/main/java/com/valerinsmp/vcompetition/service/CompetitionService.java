@@ -4,6 +4,7 @@ import com.valerinsmp.vcompetition.VCompetitionPlugin;
 import com.valerinsmp.vcompetition.model.BlockKey;
 import com.valerinsmp.vcompetition.model.ChallengeType;
 import com.valerinsmp.vcompetition.storage.SQLiteManager;
+import com.valerinsmp.vcompetition.util.TimeUtil;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -338,6 +339,7 @@ public final class CompetitionService {
     // ── Block placement anti-exploit ─────────────────────────────────────────
     public void registerPlacedBlock(BlockKey blockKey) {
         if (!runtimeActive) return;
+        if (!hasAnyBlockChallenge()) return;
         if (placedBlocks.add(blockKey)) {
             dirtyPlacedAdd.add(blockKey);
             dirtyPlacedRemove.remove(blockKey);
@@ -432,6 +434,9 @@ public final class CompetitionService {
         markRankingDirty(slot);
         scheduleDirtyFlush(slot, uuid, player.getName(), updated);
         scheduleOutrankFlush(slot);
+        if (plugin.getBossBarService() != null) {
+            plugin.getBossBarService().showOrUpdate(slot.slotId, uuid);
+        }
     }
 
     // ── Admin operations (daily slot) ────────────────────────────────────────
@@ -480,9 +485,9 @@ public final class CompetitionService {
     // ── Admin point editing ──────────────────────────────────────────────────
     public boolean handlePointEdit(CommandSender sender, String[] args, String label,
                                    VCompetitionPlugin.PointOperation operation, String slotId) {
-        if (args.length < 4) {
+        if (args.length < 3) {
             plugin.getMessageService().sendPath(sender, "messages.point-edit.usage",
-                    List.of("&cUso: /%label% admin %operation% <jugador> <puntos>"),
+                    List.of("&cUso: /%label% %operation% <jugador> <puntos>"),
                     plugin.getMessageService().placeholders("%label%", label, "%operation%", operation.commandName()));
             return true;
         }
@@ -492,10 +497,10 @@ public final class CompetitionService {
             return true;
         }
 
-        OfflinePlayer target = Bukkit.getOfflinePlayer(args[2]);
+        OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
         int points;
         try {
-            points = Integer.parseInt(args[3]);
+            points = Integer.parseInt(args[2]);
         } catch (NumberFormatException exception) {
             plugin.getMessageService().sendPath(sender, "messages.point-edit.invalid-points",
                     List.of("&cPuntos inválidos."), Map.of());
@@ -508,7 +513,7 @@ public final class CompetitionService {
                     List.of("&cJugador inválido."), Map.of());
             return true;
         }
-        String targetName = target.getName() == null ? args[2] : target.getName();
+        String targetName = target.getName() == null ? args[1] : target.getName();
 
         ChallengeSlot slot = activeSlots.get(slotId);
         if (slot == null) return true;
@@ -593,12 +598,23 @@ public final class CompetitionService {
         return builder.build();
     }
 
-    public void sendTop(CommandSender sender) {
-        sendTop(sender, SLOT_DAILY);
+    public void sendUnifiedTop(CommandSender sender) {
+        boolean hasDaily = activeSlots.containsKey(SLOT_DAILY);
+        boolean hasSpecial = activeSlots.containsKey(SLOT_SPECIAL);
+        if (!hasDaily && !hasSpecial) {
+            plugin.getMessageService().sendPath(sender, "messages.status-no-active",
+                    List.of("<gray>No hay torneo activo."), Map.of());
+            return;
+        }
+        if (hasDaily) sendTop(sender, SLOT_DAILY);
+        if (hasSpecial) sendTop(sender, SLOT_SPECIAL);
     }
 
     public void sendTop(CommandSender sender, String slotId) {
-        plugin.getMessageService().sendPath(sender, "messages.top-header", List.of("&7Top"), Map.of());
+        ChallengeSlot slot = activeSlots.get(slotId);
+        String challengeName = slot != null ? slot.type.displayName() : slotId;
+        plugin.getMessageService().sendPath(sender, "messages.top-header", List.of("&7Top"),
+                plugin.getMessageService().placeholders("%challenge%", challengeName));
         List<VCompetitionPlugin.RankingEntry> top = getRankingEntries(slotId);
         if (top.isEmpty()) {
             plugin.getMessageService().sendPath(sender, "messages.top-empty", List.of("&7Sin participantes"), Map.of());
@@ -756,6 +772,9 @@ public final class CompetitionService {
         // Clear all in-memory state now that rewards are processed
         clearSlotState(slot);
 
+        if (plugin.getBossBarService() != null) {
+            plugin.getBossBarService().hideSlotBars(slotId);
+        }
         sqliteManager.saveChallengeState(slotId, null, 0L, 0L, false);
     }
 
@@ -794,7 +813,10 @@ public final class CompetitionService {
             }
         }
 
-        if (!ranking.isEmpty()) {
+        if (ranking.isEmpty()) {
+            plugin.getMessageService().broadcastPath("messages.challenge-end-no-participants",
+                    List.of("%prefix%<gray>No hubo participantes en este torneo."), Map.of());
+        } else {
             VCompetitionPlugin.RankingEntry winner = ranking.get(0);
             long now = System.currentTimeMillis();
 
@@ -804,22 +826,16 @@ public final class CompetitionService {
             names.put(winner.uuid(), winner.name());
             sqliteManager.recordWinner(challengeType, winner.uuid(), winner.name(), winner.points(), now);
 
-            plugin.getMessageService().broadcastPath("messages.winner-global",
-                    List.of("<gold>Ganador %player%</gold>"),
-                    plugin.getMessageService().placeholders(
-                            "%challenge%", challengeType.displayName(),
-                            "%player%", winner.name(),
-                            "%points%", String.valueOf(winner.points())));
-
             int topLimit = Math.min(3, ranking.size());
             for (int i = 0; i < topLimit; i++) {
                 VCompetitionPlugin.RankingEntry entry = ranking.get(i);
-                plugin.getMessageService().broadcastPath("messages.winner-top-line",
-                        List.of("%prefix%<gray>Top #%rank%: <yellow>%player%</yellow> - <aqua>%points%</aqua></gray>"),
+                String rewardDisplay = getChallengeRewardDisplay(challengeType, "top" + (i + 1));
+                plugin.getMessageService().broadcastPath("messages.challenge-end-top" + (i + 1),
+                        List.of("%prefix%<gray>#" + (i + 1) + " <yellow>%player%</yellow> — <aqua>%points% pts</aqua>"),
                         plugin.getMessageService().placeholders(
-                                "%rank%", String.valueOf(i + 1),
                                 "%player%", entry.name(),
-                                "%points%", String.valueOf(entry.points())));
+                                "%points%", String.valueOf(entry.points()),
+                                "%reward%", rewardDisplay));
             }
 
             Player onlineWinner = Bukkit.getPlayer(winner.uuid());
@@ -841,6 +857,16 @@ public final class CompetitionService {
         List<String> specific = plugin.getConfig().getStringList(typePath);
         if (!specific.isEmpty()) return specific;
         return plugin.getConfig().getStringList("rewards." + position + ".commands");
+    }
+
+    /** Resolves the human-readable reward description for a challenge type and position. */
+    private String getChallengeRewardDisplay(ChallengeType type, String position) {
+        String typePath = "competition-types." + type.name().toLowerCase(Locale.ROOT)
+                + ".rewards." + position + ".display";
+        String specific = plugin.getConfig().getString(typePath);
+        if (specific != null && !specific.isBlank()) return specific;
+        String global = plugin.getConfig().getString("rewards." + position + ".display", "");
+        return global != null ? global : "";
     }
 
     // ── Per-slot task scheduling helpers ────────────────────────────────────
@@ -891,7 +917,9 @@ public final class CompetitionService {
     private void flushDirtyScores(ChallengeSlot slot) {
         if (slot.dirtyScores.isEmpty()) return;
         Map<UUID, Integer> snapshot = new java.util.HashMap<>(slot.dirtyScores);
-        slot.dirtyScores.keySet().removeAll(snapshot.keySet());
+        // Use conditional remove to avoid silently discarding concurrent score updates:
+        // if the value changed since we snapshotted it, leave it in dirty for the next flush.
+        snapshot.forEach((uuid, pts) -> slot.dirtyScores.remove(uuid, pts));
         sqliteManager.batchUpsertPlayerScores(slot.slotId, slot.type, snapshot, names);
     }
 
@@ -1076,14 +1104,6 @@ public final class CompetitionService {
 
     // ── Utility ──────────────────────────────────────────────────────────────
     private String formatDuration(long millis) {
-        long totalSeconds = Math.max(0, millis / 1_000L);
-        long days    = totalSeconds / 86_400L;
-        long hours   = (totalSeconds % 86_400L) / 3_600L;
-        long minutes = (totalSeconds % 3_600L)  / 60L;
-        long seconds = totalSeconds % 60L;
-        if (days    > 0) return days    + "d " + hours   + "h";
-        if (hours   > 0) return hours   + "h " + minutes + "m";
-        if (minutes > 0) return minutes + "m " + seconds + "s";
-        return seconds + "s";
+        return TimeUtil.formatDuration(millis);
     }
 }

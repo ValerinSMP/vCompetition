@@ -2,6 +2,7 @@ package com.valerinsmp.vcompetition.placeholder;
 
 import com.valerinsmp.vcompetition.VCompetitionPlugin;
 import com.valerinsmp.vcompetition.model.ChallengeType;
+import com.valerinsmp.vcompetition.util.TimeUtil;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.OfflinePlayer;
 import org.jetbrains.annotations.NotNull;
@@ -188,21 +189,7 @@ public final class VCompetitionPlaceholderExpansion extends PlaceholderExpansion
     }
 
     private String formatDuration(long millis) {
-        long totalSeconds = Math.max(0L, millis / 1000L);
-        long days = totalSeconds / 86400L;
-        long hours = (totalSeconds % 86400L) / 3600L;
-        long minutes = (totalSeconds % 3600L) / 60L;
-        long seconds = totalSeconds % 60L;
-        if (days > 0) {
-            return days + "d " + hours + "h";
-        }
-        if (hours > 0) {
-            return hours + "h " + minutes + "m";
-        }
-        if (minutes > 0) {
-            return minutes + "m " + seconds + "s";
-        }
-        return seconds + "s";
+        return TimeUtil.formatDuration(millis);
     }
 
     private String formatChallengePretty(ChallengeType type) {
