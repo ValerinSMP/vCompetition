@@ -81,6 +81,16 @@ fancy-npcs:
       top1: ""
       top2: ""
       top3: ""
+    # NPCs para el top del evento especial (slot 'special'). Vacío = deshabilitado para ese slot.
+    top-npcs-special:
+      top1: ""
+      top2: ""
+      top3: ""
+    fallback-skins-special:
+      global: ""
+      top1: ""
+      top2: ""
+      top3: ""
 
 # ── Tipos de competición ─────────────────────────────────────────────────────
 competition-types:
@@ -131,6 +141,20 @@ competition-types:
       # Nether
       - CRIMSON_STEM
       - WARPED_STEM
+      # Stripped (un árbol ya raspado por otro jugador sigue siendo el mismo tronco natural
+      # al romperlo — sin esto, esos troncos no contaban)
+      - STRIPPED_OAK_LOG
+      - STRIPPED_SPRUCE_LOG
+      - STRIPPED_BIRCH_LOG
+      - STRIPPED_JUNGLE_LOG
+      - STRIPPED_ACACIA_LOG
+      - STRIPPED_DARK_OAK_LOG
+      - STRIPPED_MANGROVE_LOG
+      - STRIPPED_CHERRY_LOG
+      - STRIPPED_PALE_OAK_LOG
+      - STRIPPED_BAMBOO_BLOCK
+      - STRIPPED_CRIMSON_STEM
+      - STRIPPED_WARPED_STEM
 
   fishing:
     materials:
@@ -153,6 +177,7 @@ competition-types:
       - SPIDER
       - CAVE_SPIDER
       - ENDERMAN
+      - ENDERMITE
       - WITCH
       - PHANTOM
       # Illagers
@@ -161,6 +186,7 @@ competition-types:
       - EVOKER
       - VEX
       - RAVAGER
+      - ILLUSIONER
       # Nether
       - ZOMBIFIED_PIGLIN
       - PIGLIN
@@ -174,10 +200,14 @@ competition-types:
       - BREEZE           # 1.21
       # Otros
       - GUARDIAN
+      - ELDER_GUARDIAN
+      - SHULKER
       - SLIME
       - SILVERFISH
       - WARDEN           # 1.19
       - CREAKING         # 1.21.2
+      # Nota: WITHER y ENDER_DRAGON quedan fuera a propósito (bosses únicos, darían
+      # el torneo entero de un solo kill). Mobs pasivos/de granja tampoco se incluyen.
 
   farming:
     materials:
@@ -195,7 +225,10 @@ competition-types:
       - NETHER_WART
       - COCOA
       - SWEET_BERRY_BUSH
-      - CAVE_VINES_PLANT # 1.17 - glow berries
+      - CAVE_VINES       # 1.17 - glow berries (segmento cabeza, con edad)
+      - CAVE_VINES_PLANT # 1.17 - glow berries (segmentos colgantes)
+      # Nota: COCOA, SWEET_BERRY_BUSH y CAVE_VINES(_PLANT) se cosechan normalmente con
+      # click derecho (no rompen el bloque) — ver CompetitionListener#onPlayerInteract.
       # Sniffer (1.20)
       - TORCHFLOWER
       - PITCHER_PLANT

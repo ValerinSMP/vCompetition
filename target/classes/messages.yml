@@ -6,6 +6,9 @@ messages:
     - ' '
     - '%prefix%<green>⚔ ¡Inició el torneo de <yellow>%challenge%</yellow>! ¡Compite por el top!</green>'
     - ' '
+  # Línea corta y clickeable que se manda junto con challenge-start: explica qué cuenta
+  # y al hacer click ejecuta "/torneos info <tipo>" para el detalle completo.
+  challenge-start-hint: '%prefix%<click:run_command:"/torneos info %type_raw%"><hover:show_text:"<gray>Click para ver el detalle completo</gray>"><gray>%description% <dark_gray>(<yellow>click para más info</yellow>)</dark_gray></gray></hover></click>'
   challenge-end:
     - ' '
     - '%prefix%<red>⌛ El torneo de <yellow>%challenge%</yellow> terminó.</red>'
@@ -19,6 +22,35 @@ messages:
   outrank-self: '%prefix%<gray>Subiste al puesto <yellow>#%rank%</yellow> superando a <yellow>%count%</yellow> jugadores.</gray>'
   outrank-global: '%prefix%<aqua>%player%</aqua> <gray>ha superado a <yellow>%victim%</yellow> y subió al puesto <yellow>#%rank%</yellow>.</gray>'
   outrank-global-summary: '%prefix%<aqua>%player%</aqua> <gray>acaba de superar a <yellow>%count%</yellow> jugadores en el torneo.</gray>'
+
+  # ── Nombres de los tipos de competencia (opcional) ───────────────────────
+  # Si un tipo no se define acá, se usa el nombre por defecto embebido en el plugin.
+  challenge-names:
+    MINING: "ᴍɪɴᴇʀɪᴀ"
+    WOODCUTTING: "ᴛᴀʟᴀ"
+    FISHING: "ᴘᴇꜱᴄᴀ"
+    SLAYER: "ᴄᴀᴢᴀ"
+    FARMING: "ꜰᴀʀᴍᴇᴏ"
+    OTONO: "ᴏᴛᴏɴ̃ᴏ"
+
+  # ── Info: qué cuenta en cada tipo de torneo ──────────────────────────────
+  info:
+    header:
+      - ' '
+      - '<gradient:#FFD166:#FF9F1C>ᴛᴏʀɴᴇᴏꜱ</gradient> <#FFD166>— ¿Qué cuenta en cada torneo?'
+    # Una línea por tipo. El tag <click> hace que al presionar sugiera (no ejecuta)
+    # "/torneos info <tipo>" para ver el desglose completo de items/mobs.
+    line: ' <#FFD166>⏵ <yellow>%challenge%</yellow> <#DDDDDD>— <white>%description%</white> <click:suggest_command:"/torneos info %type_raw%"><dark_gray>[<gray>ver detalle</gray>]</dark_gray></click>'
+    detail-header: '<#DDDDDD>─────── <#FFD166>%challenge% <#DDDDDD>───────'
+    detail-empty: ' <gray>No hay items configurados para este tipo todavía.'
+    invalid-type: '%prefix%<red>Tipo inválido. Opciones: <yellow>%types%'
+    descriptions:
+      MINING: 'Romper cualquier mineral (carbón, hierro, oro, diamante, etc.)'
+      WOODCUTTING: 'Romper cualquier tronco, de cualquier árbol'
+      FISHING: 'Atrapar cualquier pez con caña de pescar'
+      SLAYER: 'Matar cualquier mob hostil que haya aparecido de forma natural'
+      FARMING: 'Cosechar cualquier cultivo (trigo, zanahorias, cacao, etc.)'
+      OTONO: 'Evento especial de otoño: cosecha y follaje otoñal'
 
   # ── Estado / top ─────────────────────────────────────────────────────────
   status-no-active: '<#DDDDDD>No hay torneo activo en este momento.'
@@ -35,6 +67,7 @@ messages:
       - ' <#FFD166>⏵ <white>/%label% <#DDDDDD>| <#FFDC80>Ver estado del torneo activo'
       - ' <#FFD166>⏵ <white>/%label% status <#DDDDDD>| <#FFDC80>Estado del torneo actual'
       - ' <#FFD166>⏵ <white>/%label% top <#DDDDDD>| <#FFDC80>Ver el ranking actual'
+      - ' <#FFD166>⏵ <white>/%label% info [tipo] <#DDDDDD>| <#FFDC80>Ver qué cuenta en cada torneo'
       - ' <#FFD166>⏵ <#FFDC80>/torneoadmin <#DDDDDD>| <#FFD166>Comandos de administrador'
       - ' '
     admin:
@@ -55,14 +88,7 @@ messages:
 
   # ── Mensajes comunes de comandos ─────────────────────────────────────────
   commands:
-    no-permission: '%prefix%<red>No tienes permiso para ejecutar este comando.'
     invalid-subcommand: '%prefix%<red>Subcomando inválido. Usa <yellow>/%label% help</yellow> para ver los disponibles.'
-    invalid-challenge: '%prefix%<red>Tipo de torneo inválido. Opciones: <yellow>%types%'
-    invalid-number: '%prefix%<red>El valor <yellow>%value%</yellow> no es un número válido.'
-    invalid-player: '%prefix%<red>No se encontró al jugador <yellow>%player%</yellow>.'
-    no-active-daily: '%prefix%<red>No hay torneo diario activo en este momento.'
-    no-active-special: '%prefix%<red>No hay evento especial activo en este momento.'
-    missing-argument: '%prefix%<red>Argumento faltante. Uso: <yellow>%usage%'
 
   # ── Admin ────────────────────────────────────────────────────────────────
   admin:
@@ -79,6 +105,7 @@ messages:
     stopped: '%prefix%<green>Torneo finalizado correctamente. Recompensas entregadas.'
     stopped-special: '%prefix%<green>Evento especial finalizado correctamente. Recompensas entregadas.'
     stopped-no-rewards: '%prefix%<yellow>Torneo detenido sin entregar recompensas.'
+    stopped-special-no-rewards: '%prefix%<yellow>Evento especial detenido sin entregar recompensas.'
     reload-success: '%prefix%<green>Configuración recargada correctamente.'
     usage-setduration: '%prefix%<red>Uso: <yellow>/%label% setduration <minutos>'
     invalid-number: '%prefix%<red>Debes ingresar un número válido.'
@@ -104,7 +131,8 @@ messages:
     db-active-tasks: ' <#DDDDDD>⏵ <gray>DB tareas activas: <white>%value%'
     db-queue-size: ' <#DDDDDD>⏵ <gray>DB cola pendiente: <white>%value%'
     db-pending-futures: ' <#DDDDDD>⏵ <gray>DB futures pendientes: <white>%value%'
-    challenge-active: ' <#DDDDDD>⏵ <gray>Torneo activo: <white>%value%'
+    challenge-active: ' <#DDDDDD>⏵ <gray>Torneo diario activo: <white>%value%'
+    challenge-active-special: ' <#DDDDDD>⏵ <gray>Evento especial activo: <white>%value%'
     participants: ' <#DDDDDD>⏵ <gray>Participantes cargados: <white>%value%'
     placed-cache: ' <#DDDDDD>⏵ <gray>Placed blocks cache: <white>%value%'
     papi-registered: ' <#DDDDDD>⏵ <gray>PAPI registrado: <white>%value%'

@@ -1,6 +1,7 @@
 package com.valerinsmp.vcompetition.service;
 
 import com.valerinsmp.vcompetition.VCompetitionPlugin;
+import com.valerinsmp.vcompetition.model.ChallengeType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -36,8 +37,11 @@ public final class MessageService {
         messagesConfig = YamlConfiguration.loadConfiguration(messagesFile);
     }
 
+    private static final String DEFAULT_PREFIX =
+            "<dark_gray>[</dark_gray><gradient:#FFD166:#FF9F1C>ᴛᴏʀɴᴇᴏꜱ</gradient><dark_gray>]</dark_gray> <reset>";
+
     public Component renderPrefixed(String raw) {
-        String prefix = getString("messages.prefix", "&8[<gradient:#FFD166:#FF9F1C>ᴛᴏʀɴᴇᴏꜱ</gradient>&8] <reset>");
+        String prefix = getString("messages.prefix", DEFAULT_PREFIX);
         Component prefixComponent = renderSegment(prefix);
         Component bodyComponent = renderSegment(raw);
         return prefixComponent.append(bodyComponent);
@@ -45,6 +49,14 @@ public final class MessageService {
 
     public Component renderRaw(String raw) {
         return renderSegment(raw);
+    }
+
+    private static final String NO_CHALLENGE_NAME = "ɴɪɴɢᴜɴᴏ";
+
+    /** Resolves the display name for a challenge type, preferring an admin override from messages.yml (challenge-names.<TYPE>). */
+    public String challengeDisplayName(ChallengeType type) {
+        if (type == null) return NO_CHALLENGE_NAME;
+        return getString("messages.challenge-names." + type.name(), type.displayName());
     }
 
     private Component renderSegment(String raw) {
@@ -121,7 +133,7 @@ public final class MessageService {
 
     private Component renderConfiguredLine(String rawLine, Map<String, String> placeholders) {
         String line = applyPlaceholders(rawLine, placeholders);
-        String prefix = getString("messages.prefix", "&8[<gradient:#FFD166:#FF9F1C>ᴛᴏʀɴᴇᴏꜱ</gradient>&8] <reset>");
+        String prefix = getString("messages.prefix", DEFAULT_PREFIX);
 
         if (line.contains("%prefix%")) {
             return renderRaw(line.replace("%prefix%", prefix));

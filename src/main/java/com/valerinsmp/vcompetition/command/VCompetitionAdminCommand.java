@@ -57,7 +57,7 @@ public final class VCompetitionAdminCommand implements TabExecutor {
                     plugin.startAdminChallenge(type);
                     plugin.getMessageService().sendPath(sender, "messages.admin.started",
                             List.of("&aTorneo iniciado: &e%challenge%"),
-                            plugin.getMessageService().placeholders("%challenge%", type.displayName()));
+                            plugin.getMessageService().placeholders("%challenge%", plugin.getMessageService().challengeDisplayName(type)));
                 } catch (IllegalArgumentException e) {
                     sendInvalidChallenge(sender, false);
                 }
@@ -75,7 +75,7 @@ public final class VCompetitionAdminCommand implements TabExecutor {
                     plugin.startAdminChallengeUntilScheduleEnd(type);
                     plugin.getMessageService().sendPath(sender, "messages.admin.started-until-sunday",
                             List.of("&aTorneo hasta cierre del slot: &e%challenge%"),
-                            plugin.getMessageService().placeholders("%challenge%", type.displayName()));
+                            plugin.getMessageService().placeholders("%challenge%", plugin.getMessageService().challengeDisplayName(type)));
                 } catch (IllegalArgumentException e) {
                     sendInvalidChallenge(sender, false);
                 }
@@ -117,7 +117,7 @@ public final class VCompetitionAdminCommand implements TabExecutor {
                     plugin.startAdminSpecialChallenge(type);
                     plugin.getMessageService().sendPath(sender, "messages.admin.started-special",
                             List.of("&aEvento especial iniciado: &e%challenge%"),
-                            plugin.getMessageService().placeholders("%challenge%", type.displayName()));
+                            plugin.getMessageService().placeholders("%challenge%", plugin.getMessageService().challengeDisplayName(type)));
                 } catch (IllegalArgumentException e) {
                     sendInvalidChallenge(sender, true);
                 }
@@ -141,7 +141,7 @@ public final class VCompetitionAdminCommand implements TabExecutor {
                     return true;
                 }
                 plugin.stopAdminSpecialChallengeNoRewards();
-                plugin.getMessageService().sendPath(sender, "messages.admin.stopped-no-rewards",
+                plugin.getMessageService().sendPath(sender, "messages.admin.stopped-special-no-rewards",
                         List.of("&eEvento especial detenido sin recompensas."), Collections.emptyMap());
                 return true;
             }

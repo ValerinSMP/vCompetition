@@ -321,8 +321,13 @@ public final class CompetitionService {
     }
 
     public VCompetitionPlugin.RankingEntry getCurrentTopAt(String slotId, int rank) {
-        List<VCompetitionPlugin.RankingEntry> ranking = getRankingEntries(slotId);
-        return (rank < 1 || rank > ranking.size()) ? null : ranking.get(rank - 1);
+        ChallengeSlot slot = activeSlots.get(slotId);
+        if (slot == null) return null;
+        refreshRankSnapshotIfNeeded(slot);
+        List<UUID> ordered = slot.rankSnapshot;
+        if (rank < 1 || rank > ordered.size()) return null;
+        UUID uuid = ordered.get(rank - 1);
+        return new VCompetitionPlugin.RankingEntry(uuid, names.getOrDefault(uuid, "Unknown"), slot.scores.getOrDefault(uuid, 0));
     }
     public VCompetitionPlugin.RankingEntry getCurrentTopAt(int rank) { return getCurrentTopAt(SLOT_DAILY, rank); }
 
@@ -590,7 +595,7 @@ public final class CompetitionService {
                     .stream().findFirst().orElse("&aTorneo activo: %challenge% | %time_left%");
             msg = plugin.getMessageService().applyPlaceholders(msg,
                     plugin.getMessageService().placeholders(
-                            "%challenge%", slot.type.displayName(),
+                            "%challenge%", plugin.getMessageService().challengeDisplayName(slot.type),
                             "%time_left%", formatDuration(getRemainingMillis(slot.slotId))));
             builder.append(plugin.getMessageService().renderPrefixed(msg));
             first = false;
@@ -612,7 +617,7 @@ public final class CompetitionService {
 
     public void sendTop(CommandSender sender, String slotId) {
         ChallengeSlot slot = activeSlots.get(slotId);
-        String challengeName = slot != null ? slot.type.displayName() : slotId;
+        String challengeName = slot != null ? plugin.getMessageService().challengeDisplayName(slot.type) : slotId;
         plugin.getMessageService().sendPath(sender, "messages.top-header", List.of("&7Top"),
                 plugin.getMessageService().placeholders("%challenge%", challengeName));
         List<VCompetitionPlugin.RankingEntry> top = getRankingEntries(slotId);
@@ -651,7 +656,7 @@ public final class CompetitionService {
         plugin.getMessageService().sendPath(sender, "messages.debug.challenge-active",
                 List.of("&fTorneo diario: &a%value%"),
                 plugin.getMessageService().placeholders("%value%", dailyInfo));
-        plugin.getMessageService().sendPath(sender, "messages.debug.challenge-active",
+        plugin.getMessageService().sendPath(sender, "messages.debug.challenge-active-special",
                 List.of("&fEvento especial: &a%value%"),
                 plugin.getMessageService().placeholders("%value%", specialInfo));
 
@@ -739,7 +744,13 @@ public final class CompetitionService {
         if (announce) {
             plugin.getMessageService().broadcastPath("messages.challenge-start",
                     List.of("<green>Inició %challenge%</green>"),
-                    plugin.getMessageService().placeholders("%challenge%", type.displayName()));
+                    plugin.getMessageService().placeholders("%challenge%", plugin.getMessageService().challengeDisplayName(type)));
+            String description = plugin.getMessageService().getString("messages.info.descriptions." + type.name(), "");
+            plugin.getMessageService().broadcastPath("messages.challenge-start-hint",
+                    List.of("%prefix%<gray>%description%</gray>"),
+                    plugin.getMessageService().placeholders(
+                            "%description%", description,
+                            "%type_raw%", type.name().toLowerCase(Locale.ROOT)));
             if (plugin.getSoundService() != null) {
                 plugin.getSoundService().playTournamentStart();
             }
@@ -757,7 +768,7 @@ public final class CompetitionService {
         if (announceAndReward) {
             plugin.getMessageService().broadcastPath("messages.challenge-end",
                     List.of("<red>Terminó %challenge%</red>"),
-                    plugin.getMessageService().placeholders("%challenge%", slot.type.displayName()));
+                    plugin.getMessageService().placeholders("%challenge%", plugin.getMessageService().challengeDisplayName(slot.type)));
             if (plugin.getSoundService() != null) {
                 plugin.getSoundService().playTournamentEnd();
             }
@@ -843,7 +854,7 @@ public final class CompetitionService {
                 plugin.getMessageService().sendPath(onlineWinner, "messages.winner-private",
                         List.of("<green>Ganaste</green>"),
                         plugin.getMessageService().placeholders(
-                                "%challenge%", challengeType.displayName(),
+                                "%challenge%", plugin.getMessageService().challengeDisplayName(challengeType),
                                 "%player%", winner.name(),
                                 "%points%", String.valueOf(winner.points())));
             }
@@ -1017,7 +1028,7 @@ public final class CompetitionService {
                 plugin.getMessageService().sendPath(victim, "messages.outrank-private",
                         List.of("<yellow>Superado por %player%</yellow>"),
                         plugin.getMessageService().placeholders(
-                                "%challenge%", slot.type.displayName(),
+                                "%challenge%", plugin.getMessageService().challengeDisplayName(slot.type),
                                 "%player%", actorName,
                                 "%victim%", names.getOrDefault(victimUuid, "Unknown"),
                                 "%rank%", rankText));
@@ -1033,7 +1044,7 @@ public final class CompetitionService {
             plugin.getMessageService().broadcastPath("messages.outrank-global-summary",
                     List.of("%prefix%<aqua>%player%</aqua> <gray>subió al puesto <yellow>#%rank%</yellow> superando a <yellow>%count%</yellow> jugadores.</gray>"),
                     plugin.getMessageService().placeholders(
-                            "%challenge%", slot.type.displayName(),
+                            "%challenge%", plugin.getMessageService().challengeDisplayName(slot.type),
                             "%player%", actorName,
                             "%rank%", String.valueOf(newIndex + 1),
                             "%count%", String.valueOf(victims.size())));
@@ -1042,7 +1053,7 @@ public final class CompetitionService {
                 plugin.getMessageService().broadcastPath("messages.outrank-global",
                         List.of("<aqua>%player% superó a %victim%</aqua>"),
                         plugin.getMessageService().placeholders(
-                                "%challenge%", slot.type.displayName(),
+                                "%challenge%", plugin.getMessageService().challengeDisplayName(slot.type),
                                 "%player%", actorName,
                                 "%victim%", names.getOrDefault(victimUuid, "Unknown"),
                                 "%rank%", rankText));
@@ -1062,7 +1073,7 @@ public final class CompetitionService {
         plugin.getMessageService().sendPath(actorPlayer, "messages.outrank-self",
                 List.of("%prefix%<gray>Subiste al puesto <yellow>#%rank%</yellow> superando a <yellow>%count%</yellow> jugadores.</gray>"),
                 plugin.getMessageService().placeholders(
-                        "%challenge%", slot.type.displayName(),
+                        "%challenge%", plugin.getMessageService().challengeDisplayName(slot.type),
                         "%player%", actorName,
                         "%rank%", String.valueOf(newIndex + 1),
                         "%count%", String.valueOf(victimCount)));

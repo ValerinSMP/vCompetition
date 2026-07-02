@@ -123,13 +123,17 @@ public final class DailyScheduleService {
 
     private Slot currentSlot(ZonedDateTime now) {
         if (cachedSlots == null || cachedSlots.isEmpty()) return null;
-        for (int[] s : cachedSlots) {
-            ZonedDateTime slotStart = now.toLocalDate()
-                    .atTime(LocalTime.of(s[0], s[1]))
-                    .atZone(cachedZoneId);
-            ZonedDateTime slotEnd = slotStart.plusMinutes(cachedDurationMinutes);
-            if (!now.isBefore(slotStart) && now.isBefore(slotEnd)) {
-                return new Slot(slotStart, slotEnd);
+        // Also check yesterday's start so slots that cross midnight (e.g. 23:30 + 60min) are
+        // still detected right after 00:00, when "today" would otherwise compute a start in the future.
+        for (int dayOffset = 0; dayOffset >= -1; dayOffset--) {
+            for (int[] s : cachedSlots) {
+                ZonedDateTime slotStart = now.toLocalDate().plusDays(dayOffset)
+                        .atTime(LocalTime.of(s[0], s[1]))
+                        .atZone(cachedZoneId);
+                ZonedDateTime slotEnd = slotStart.plusMinutes(cachedDurationMinutes);
+                if (!now.isBefore(slotStart) && now.isBefore(slotEnd)) {
+                    return new Slot(slotStart, slotEnd);
+                }
             }
         }
         return null;

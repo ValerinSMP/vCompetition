@@ -26,7 +26,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.sql.SQLException;
 import java.util.UUID;
 
-public final class VCompetitionPlugin extends JavaPlugin {
+public class VCompetitionPlugin extends JavaPlugin {
     private SQLiteManager sqliteManager;
     private MessageService messageService;
     private SoundService soundService;
@@ -42,6 +42,9 @@ public final class VCompetitionPlugin extends JavaPlugin {
         saveDefaultConfig();
         saveResourceIfMissing("messages.yml");
         saveResourceIfMissing("sounds.yml");
+        mergeConfigDefaults();
+        mergeFileDefaults("messages.yml");
+        mergeFileDefaults("sounds.yml");
 
         sqliteManager  = new SQLiteManager(this);
         messageService = new MessageService(this);
@@ -296,6 +299,39 @@ public final class VCompetitionPlugin extends JavaPlugin {
         if (!getDataFolder().exists()) getDataFolder().mkdirs();
         java.io.File file = new java.io.File(getDataFolder(), name);
         if (!file.exists()) saveResource(name, false);
+    }
+
+    /** Adds any key present in the bundled config.yml but missing from the one on disk, without touching existing values. */
+    private void mergeConfigDefaults() {
+        org.bukkit.configuration.file.YamlConfiguration defaults = loadBundledYaml("config.yml");
+        if (defaults == null) return;
+        reloadConfig(); // re-read from disk — getConfig() is cached and must not shadow the file we're merging into
+        getConfig().setDefaults(defaults);
+        getConfig().options().copyDefaults(true);
+        saveConfig();
+    }
+
+    /** Same as {@link #mergeConfigDefaults()} but for a standalone YAML resource (messages.yml, sounds.yml). */
+    private void mergeFileDefaults(String resourceName) {
+        java.io.File file = new java.io.File(getDataFolder(), resourceName);
+        org.bukkit.configuration.file.YamlConfiguration defaults = loadBundledYaml(resourceName);
+        if (!file.exists() || defaults == null) return;
+
+        org.bukkit.configuration.file.YamlConfiguration current = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file);
+        current.setDefaults(defaults);
+        current.options().copyDefaults(true);
+        try {
+            current.save(file);
+        } catch (java.io.IOException exception) {
+            getLogger().warning("No se pudo actualizar " + resourceName + " con nuevas claves: " + exception.getMessage());
+        }
+    }
+
+    private org.bukkit.configuration.file.YamlConfiguration loadBundledYaml(String resourceName) {
+        java.io.InputStream stream = getResource(resourceName);
+        if (stream == null) return null;
+        return org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(
+                new java.io.InputStreamReader(stream, java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private void registerPlaceholders() {

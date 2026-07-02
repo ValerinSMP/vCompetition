@@ -42,8 +42,7 @@ public final class VCompetitionPlaceholderExpansion extends PlaceholderExpansion
         String key = params.toLowerCase(Locale.ROOT);
 
         if (key.equals("challenge")) {
-            ChallengeType type = plugin.getActiveChallenge();
-            return type == null ? "ɴɪɴɢᴜɴᴏ" : type.displayName();
+            return formatChallengePretty(plugin.getActiveChallenge());
         }
 
         if (key.equals("challenge_raw")) {
@@ -79,6 +78,45 @@ public final class VCompetitionPlaceholderExpansion extends PlaceholderExpansion
                 return "0";
             }
             VCompetitionPlugin.RankingEntry entry = plugin.getCurrentTopAt(rank);
+            return entry == null ? "0" : String.valueOf(entry.points());
+        }
+
+        if (key.equals("special_challenge")) {
+            return formatChallengePretty(plugin.getActiveSpecialChallenge());
+        }
+
+        if (key.equals("special_challenge_raw")) {
+            ChallengeType type = plugin.getActiveSpecialChallenge();
+            return type == null ? "none" : type.name();
+        }
+
+        if (key.equals("special_challenge_pretty")) {
+            return formatChallengePretty(plugin.getActiveSpecialChallenge());
+        }
+
+        if (key.equals("special_time_left")) {
+            return formatDuration(plugin.getSpecialRemainingMillis());
+        }
+
+        if (key.equals("special_gap_top12")) {
+            return String.valueOf(plugin.getSpecialGapTopOneToTwo());
+        }
+
+        if (key.startsWith("special_top_") && key.endsWith("_name")) {
+            int rank = parseRank(key, "special_top_", "_name");
+            if (rank < 1) {
+                return "";
+            }
+            VCompetitionPlugin.RankingEntry entry = plugin.getSpecialTopAt(rank);
+            return entry == null ? "none" : entry.name();
+        }
+
+        if (key.startsWith("special_top_") && key.endsWith("_points")) {
+            int rank = parseRank(key, "special_top_", "_points");
+            if (rank < 1) {
+                return "0";
+            }
+            VCompetitionPlugin.RankingEntry entry = plugin.getSpecialTopAt(rank);
             return entry == null ? "0" : String.valueOf(entry.points());
         }
 
@@ -151,6 +189,23 @@ public final class VCompetitionPlaceholderExpansion extends PlaceholderExpansion
             return String.valueOf(plugin.getGapToBelow(player.getUniqueId()));
         }
 
+        if (key.equals("special_player_position")) {
+            int position = plugin.getSpecialPlayerPosition(player.getUniqueId());
+            return position < 0 ? "0" : String.valueOf(position);
+        }
+
+        if (key.equals("special_player_points")) {
+            return String.valueOf(plugin.getSpecialPlayerPoints(player.getUniqueId()));
+        }
+
+        if (key.equals("special_player_gap_up")) {
+            return String.valueOf(plugin.getSpecialGapToAbove(player.getUniqueId()));
+        }
+
+        if (key.equals("special_player_gap_down")) {
+            return String.valueOf(plugin.getSpecialGapToBelow(player.getUniqueId()));
+        }
+
         if (key.equals("player_wins_total")) {
             return String.valueOf(plugin.getWinsTotal(player.getUniqueId()));
         }
@@ -193,9 +248,6 @@ public final class VCompetitionPlaceholderExpansion extends PlaceholderExpansion
     }
 
     private String formatChallengePretty(ChallengeType type) {
-        if (type == null) {
-            return "ɴɪɴɢᴜɴᴏ";
-        }
-        return type.displayName();
+        return plugin.getMessageService().challengeDisplayName(type);
     }
 }

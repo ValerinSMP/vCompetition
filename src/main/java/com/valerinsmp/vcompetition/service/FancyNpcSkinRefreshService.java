@@ -88,12 +88,24 @@ public final class FancyNpcSkinRefreshService {
             return;
         }
 
-        RefreshMode mode = loadMode();
-        boolean debug = isDebugEnabled();
         invalidUsernameRetryMillis = Math.max(60_000L,
             plugin.getConfig().getLong("fancy-npcs.skin-refresh.invalid-username-retry-seconds", 1800L) * 1000L);
+
+        if (plugin.hasActiveChallenge()) {
+            refreshSlotNpcs("top-npcs", "fallback-skins", plugin::getCurrentTopAt);
+        }
+        if (plugin.hasActiveSpecialChallenge()) {
+            refreshSlotNpcs("top-npcs-special", "fallback-skins-special", plugin::getSpecialTopAt);
+        }
+    }
+
+    /** Refreshes the top1-3 NPCs for one slot (daily or special), each with its own NPC-name/fallback config subtree. */
+    private void refreshSlotNpcs(String topNpcsPath, String fallbackSkinsPath,
+                                  java.util.function.IntFunction<VCompetitionPlugin.RankingEntry> topAtFn) {
+        RefreshMode mode = loadMode();
+        boolean debug = isDebugEnabled();
         for (int rank = 1; rank <= 3; rank++) {
-            String npcName = loadTopNpcName(rank);
+            String npcName = loadTopNpcName(rank, topNpcsPath);
             if (npcName.isEmpty()) {
                 if (debug) {
                     plugin.getLogger().info("[FancyNpcs] top" + rank + " sin nombre de NPC configurado.");
@@ -101,7 +113,7 @@ public final class FancyNpcSkinRefreshService {
                 continue;
             }
 
-            VCompetitionPlugin.RankingEntry entry = plugin.getCurrentTopAt(rank);
+            VCompetitionPlugin.RankingEntry entry = topAtFn.apply(rank);
             String targetSkin = null;
             boolean fromRankingName = false;
             boolean likelyBedrockName = false;
@@ -116,7 +128,7 @@ public final class FancyNpcSkinRefreshService {
                     && plugin.getConfig().getBoolean("fancy-npcs.skin-refresh.force-fallback-when-offline-mode", false);
 
             if (targetSkin == null || targetSkin.isBlank()) {
-                targetSkin = loadFallbackSkin(rank);
+                targetSkin = loadFallbackSkin(rank, fallbackSkinsPath);
                 if (targetSkin.isBlank()) {
                     if (debug) {
                         plugin.getLogger().info("[FancyNpcs] sin datos de ranking ni fallback para top" + rank + ".");
@@ -134,7 +146,7 @@ public final class FancyNpcSkinRefreshService {
 
             if (fromRankingName) {
                 if (forceFallbackForRankingName || likelyBedrockName) {
-                    String fallback = resolveInvalidUsernameFallback(rank, targetSkin);
+                    String fallback = resolveInvalidUsernameFallback(rank, fallbackSkinsPath, targetSkin);
                     if (fallback.isBlank()) {
                         if (debug) {
                             String reason = forceFallbackForRankingName ? "offline-mode" : "gamertag bedrock";
@@ -151,7 +163,7 @@ public final class FancyNpcSkinRefreshService {
 
                 String normalized = normalizePlayerSkinIdentifier(targetSkin);
                 if (normalized.isBlank()) {
-                    String fallback = loadFallbackSkin(rank);
+                    String fallback = loadFallbackSkin(rank, fallbackSkinsPath);
                     if (fallback.isBlank() || isPlaceholderFallbackSkin(fallback)) {
                         if (debug) {
                             plugin.getLogger().warning("[FancyNpcs] nombre de jugador inválido para skin en top" + rank + ": '" + targetSkin + "' (sin fallback válido)");
@@ -204,7 +216,7 @@ public final class FancyNpcSkinRefreshService {
                 Throwable root = rootCause(exception);
                 if (isInvalidUsernameSkinException(root)) {
                     invalidUsernameRetryAt.put(skinRetryKey, System.currentTimeMillis() + invalidUsernameRetryMillis);
-                    String fallback = resolveInvalidUsernameFallback(rank, targetSkin);
+                    String fallback = resolveInvalidUsernameFallback(rank, fallbackSkinsPath, targetSkin);
                     if (!fallback.isBlank() && !fallback.equalsIgnoreCase(targetSkin)) {
                         try {
                             boolean fallbackApplied = bridge.applySkin(npcName, fallback, mode == RefreshMode.RESPAWN);
@@ -281,8 +293,8 @@ public final class FancyNpcSkinRefreshService {
         return !value.isEmpty() && value.charAt(0) == '.';
     }
 
-    private String resolveInvalidUsernameFallback(int rank, String targetSkin) {
-        String configured = loadFallbackSkin(rank);
+    private String resolveInvalidUsernameFallback(int rank, String fallbackSkinsPath, String targetSkin) {
+        String configured = loadFallbackSkin(rank, fallbackSkinsPath);
         if (!configured.isBlank()) {
             return configured;
         }
@@ -350,16 +362,16 @@ public final class FancyNpcSkinRefreshService {
         return normalized;
     }
 
-    private String loadTopNpcName(int rank) {
-        return plugin.getConfig().getString("fancy-npcs.skin-refresh.top-npcs.top" + rank, "").trim();
+    private String loadTopNpcName(int rank, String topNpcsPath) {
+        return plugin.getConfig().getString("fancy-npcs.skin-refresh." + topNpcsPath + ".top" + rank, "").trim();
     }
 
-    private String loadFallbackSkin(int rank) {
-        String global = plugin.getConfig().getString("fancy-npcs.skin-refresh.fallback-skins.global", "").trim();
+    private String loadFallbackSkin(int rank, String fallbackSkinsPath) {
+        String global = plugin.getConfig().getString("fancy-npcs.skin-refresh." + fallbackSkinsPath + ".global", "").trim();
         if (!global.isEmpty() && isUsableFallbackIdentifier(global)) {
             return global;
         }
-        String perTop = plugin.getConfig().getString("fancy-npcs.skin-refresh.fallback-skins.top" + rank, "").trim();
+        String perTop = plugin.getConfig().getString("fancy-npcs.skin-refresh." + fallbackSkinsPath + ".top" + rank, "").trim();
         return isUsableFallbackIdentifier(perTop) ? perTop : "";
     }
 

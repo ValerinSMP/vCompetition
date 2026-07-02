@@ -28,6 +28,10 @@ public final class BossBarService {
     public void start() {
         stop();
         tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 40L, 40L);
+        // Re-show bars for players already scoring in an active challenge (e.g. after /reload).
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            reattachOnJoin(player);
+        }
     }
 
     public void stop() {

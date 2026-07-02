@@ -47,12 +47,22 @@ public final class SQLiteManager {
     }
 
     public void connect() throws SQLException {
-        // Explicit class load ensures the shaded driver is registered in the current
-        // classloader — required for PlugMan reload compatibility.
+        // Explicit registration (rather than relying on the driver's static init / SPI
+        // auto-loading) ensures the driver is associated with THIS classloader context —
+        // required for PlugMan reload compatibility, and for MockBukkit test classloaders,
+        // where DriverManager's caller-classloader check otherwise rejects an already-loaded
+        // driver registered under a different loader. Falls back to the unshaded class name
+        // so tests (running against target/classes, pre-shading) work too.
         try {
-            Class.forName("com.valerinsmp.vcompetition.libs.sqlite.JDBC");
-        } catch (ClassNotFoundException exception) {
-            throw new SQLException("No se encontró el driver SQLite shadeado", exception);
+            Class<?> driverClass;
+            try {
+                driverClass = Class.forName("com.valerinsmp.vcompetition.libs.sqlite.JDBC");
+            } catch (ClassNotFoundException shaded) {
+                driverClass = Class.forName("org.sqlite.JDBC");
+            }
+            DriverManager.registerDriver((java.sql.Driver) driverClass.getDeclaredConstructor().newInstance());
+        } catch (ReflectiveOperationException exception) {
+            throw new SQLException("No se encontró el driver SQLite (ni shadeado ni plano)", exception);
         }
         File dbFile = new File(plugin.getDataFolder(), "competition.db");
         connection = DriverManager.getConnection("jdbc:sqlite:" + dbFile.getAbsolutePath());
