@@ -2,13 +2,12 @@ messages:
   prefix: '<dark_gray>[</dark_gray><gradient:#FFD166:#FF9F1C>ᴛᴏʀɴᴇᴏꜱ</gradient><dark_gray>]</dark_gray> <reset>'
 
   # ── Anuncios de torneo ────────────────────────────────────────────────────
+  # %description% y el <click>/<hover> son opcionales: se pueden quitar de la línea
+  # si no querés el detalle clickeable, el resto sigue funcionando igual.
   challenge-start:
     - ' '
-    - '%prefix%<green>⚔ ¡Inició el torneo de <yellow>%challenge%</yellow>! ¡Compite por el top!</green>'
+    - '%prefix%<green>⚔ ¡Inició el torneo de <yellow>%challenge%</yellow>! ¡Compite por el top!</green> <click:run_command:"/torneos info %type_raw%"><hover:show_text:"<gray>Click para ver el detalle completo</gray>"><dark_gray>(<gray>%description%</gray>)</dark_gray></hover></click>'
     - ' '
-  # Línea corta y clickeable que se manda junto con challenge-start: explica qué cuenta
-  # y al hacer click ejecuta "/torneos info <tipo>" para el detalle completo.
-  challenge-start-hint: '%prefix%<click:run_command:"/torneos info %type_raw%"><hover:show_text:"<gray>Click para ver el detalle completo</gray>"><gray>%description% <dark_gray>(<yellow>click para más info</yellow>)</dark_gray></gray></hover></click>'
   challenge-end:
     - ' '
     - '%prefix%<red>⌛ El torneo de <yellow>%challenge%</yellow> terminó.</red>'

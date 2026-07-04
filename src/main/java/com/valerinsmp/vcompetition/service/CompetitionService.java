@@ -177,6 +177,12 @@ public final class CompetitionService {
                     scheduleChallengeEnd(slot);
                 }
             }
+            // Purge placed-block history that survived from ended competitions.
+            // If no block competition was restored, every BlockKey in the set is stale.
+            if (!hasAnyBlockChallenge()) {
+                placedBlocks.clear();
+                sqliteManager.clearPlacedBlocks();
+            }
         } catch (Exception exception) {
             plugin.getLogger().warning("No se pudo restaurar estado: " + exception.getMessage());
         }
@@ -742,13 +748,11 @@ public final class CompetitionService {
         scheduleChallengeEnd(slot);
 
         if (announce) {
+            String description = plugin.getMessageService().getString("messages.info.descriptions." + type.name(), "");
             plugin.getMessageService().broadcastPath("messages.challenge-start",
                     List.of("<green>Inició %challenge%</green>"),
-                    plugin.getMessageService().placeholders("%challenge%", plugin.getMessageService().challengeDisplayName(type)));
-            String description = plugin.getMessageService().getString("messages.info.descriptions." + type.name(), "");
-            plugin.getMessageService().broadcastPath("messages.challenge-start-hint",
-                    List.of("%prefix%<gray>%description%</gray>"),
                     plugin.getMessageService().placeholders(
+                            "%challenge%", plugin.getMessageService().challengeDisplayName(type),
                             "%description%", description,
                             "%type_raw%", type.name().toLowerCase(Locale.ROOT)));
             if (plugin.getSoundService() != null) {
@@ -787,6 +791,12 @@ public final class CompetitionService {
             plugin.getBossBarService().hideSlotBars(slotId);
         }
         sqliteManager.saveChallengeState(slotId, null, 0L, 0L, false);
+
+        // Placed-block anti-exploit data is only relevant while a block competition is active.
+        // Clear it when no block challenges remain so the set doesn't grow unboundedly.
+        if (!hasAnyBlockChallenge()) {
+            resetPlacedCache();
+        }
     }
 
     private List<VCompetitionPlugin.RankingEntry> getRankingEntriesFromSlot(ChallengeSlot slot) {
